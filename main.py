@@ -121,7 +121,12 @@ def to_signup():
                     st.rerun()
                 else:
                     st.error(f"❌ Error: {error_message}")
-
+    elif (email != confirm_email) and (password == confirm_password):
+        st.error("⚠️ Email address entered does not match!")
+    elif (email == confirm_email) and (password != confirm_password):
+        st.error("⚠️ Password entered does not match!")
+    elif (email != confirm_email) and (password != confirm_password):
+        st.error("⚠️ Email address and Password does not match")
 
     col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
