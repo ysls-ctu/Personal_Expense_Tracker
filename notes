@@ -1,0 +1,122 @@
+
+
+
+
+
+import streamlit as st
+import firebase_admin
+from firebase_admin import credentials, auth, firestore
+import pyrebase
+import pandas as pd
+import datetime
+import time
+import json
+
+# Load Firebase Admin SDK (for Firestore)
+if not firebase_admin._apps:
+    cred = credentials.Certificate("expense-tracker-9deb0-firebase-adminsdk-fbsvc-a24c7b4c6a.json")
+    firebase_admin.initialize_app(cred)
+
+db = firestore.client()
+
+# Load Firebase config (for Authentication)
+def init_firebase():
+    with open("firebase-config.json") as f:
+        firebase_config = json.load(f)
+    return pyrebase.initialize_app(firebase_config)
+
+def to_signup():
+    st.subheader("Create an Account")
+    email = st.text_input("📧 Email")
+    password = st.text_input("🔑 Password", type="password")
+
+    if st.button("Sign Up"):
+        try:
+            # Check if the email is already registered
+            auth_client.create_user_with_email_and_password(email, password)
+            st.success("✅ Account created successfully! Please login.")
+        except Exception as e:
+            error_message = str(e)
+            if "EMAIL_EXISTS" in error_message:
+                st.error("⚠️ This email is already registered. Please **log in instead**.")
+                time.sleep(5)
+                to_login()
+            else:
+                st.error(f"❌ Error: {error_message}")
+
+def to_login():
+    st.subheader("Login to Your Account")
+    email = st.text_input("📧 Email")
+    password = st.text_input("🔑 Password", type="password")
+
+    if st.button("Login"):
+        try:
+            user = auth_client.sign_in_with_email_and_password(email, password)
+            st.session_state["user"] = user
+            st.success("✅ Logged in successfully!")
+            to_dashboard()
+        except Exception as e:
+            st.error("❌ Invalid credentials. Please try again.")
+
+def to_dashboard():
+    if "user" in st.session_state:
+        user = st.session_state["user"]
+        st.subheader("📊 Dashboard - Manage Your Expenses")
+        
+        # Add Expense Form
+        amount = st.number_input("💸 Expense Amount", min_value=0.01)
+        category = st.selectbox("📂 Category", ["Food", "Transport", "Shopping", "Other"])
+        date = st.date_input("📅 Date", datetime.date.today())
+
+        if st.button("➕ Add Expense"):
+            try:
+                db.collection("expenses").add({
+                    "user": user["email"],
+                    "amount": amount,
+                    "category": category,
+                    "date": date.strftime("%Y-%m-%d")
+                })
+                st.success("✅ Expense added successfully!")
+            except Exception as e:
+                st.error(f"❌ Error adding expense: {e}")
+
+        # Display Expenses
+        st.subheader("📜 Your Expenses")
+        try:
+            docs = db.collection("expenses").where("user", "==", user["email"]).stream()
+            expenses = [{**doc.to_dict(), "id": doc.id} for doc in docs]
+            
+            if expenses:
+                df = pd.DataFrame(expenses)
+                st.dataframe(df)
+            else:
+                st.info("ℹ️ No expenses recorded yet.")
+
+        except Exception as e:
+            st.error(f"❌ Error fetching expenses: {e}")
+    else:
+        st.warning("⚠️ Please log in to access the dashboard.")
+
+
+
+firebase = init_firebase()
+auth_client = firebase.auth()
+
+# Streamlit UI
+st.title("💰 Personal Expense Tracker")
+
+# Sidebar Menu
+menu = ["Login", "Sign Up", "Dashboard"]
+choice = st.sidebar.selectbox("Menu", menu)
+
+# Signup Section
+if choice == "Sign Up":
+    to_signup()
+
+# Login Section
+elif choice == "Login":
+    to_login()
+
+# Dashboard Section
+elif choice == "Dashboard":
+    to_dashboard()
