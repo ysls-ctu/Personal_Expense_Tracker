@@ -1,7 +1,7 @@
 import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, firestore
-import pyrebase
+import pyrebase4 as pyrebase
 import pandas as pd
 from datetime import datetime, date, timedelta
 import time

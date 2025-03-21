@@ -1,10 +1,10 @@
 streamlit
 firebase-admin
 pyrebase4
-pyrebase
 pandas
 pillow
 requests
 matplotlib
 seaborn
 pytz
+pycryptodome
