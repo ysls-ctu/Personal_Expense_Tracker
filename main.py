@@ -1,15 +1,18 @@
 import streamlit as st
 import firebase_admin
-from firebase_admin import credentials, auth, firestore, storage
+from firebase_admin import credentials, firestore
 import pyrebase
 import pandas as pd
-import datetime
+from datetime import datetime, date, timedelta
 import time
 import json
 import re
 from PIL import Image
 import io
-from datetime import date, timedelta
+import requests
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pytz
 
 # Load Firebase Admin SDK 
 if not firebase_admin._apps:
@@ -122,65 +125,103 @@ def to_login():
 
     st.markdown('</div>', unsafe_allow_html=True)
 
+CLOUD_NAME = "dusq8j5cp"
+UPLOAD_PRESET = "unsigned_upload"
+CLOUDINARY_URL = f"https://api.cloudinary.com/v1_1/{CLOUD_NAME}/image/upload"
+
+def upload_to_cloudinary(image):
+    """Uploads an image to Cloudinary and returns the URL."""
+    img_bytes = io.BytesIO()
+    image.save(img_bytes, format="PNG")  # Save image as PNG
+    img_bytes.seek(0)
+
+    # Prepare request payload
+    files = {"file": img_bytes}
+    data = {"upload_preset": UPLOAD_PRESET}
+
+    # Upload to Cloudinary
+    response = requests.post(CLOUDINARY_URL, files=files, data=data)
+    
+    if response.status_code == 200:
+        return response.json().get("secure_url")  # Return the image URL
+    else:
+        st.error("Failed to upload image.")
+        return None
+
 def to_signup():
     st.markdown('<div class="container">', unsafe_allow_html=True)
     st.markdown('<hr class="style-two-grid">', unsafe_allow_html=True)
     st.markdown('<div class="title">Create an Account</div>', unsafe_allow_html=True)
 
     # Name Fields
-    first_name = st.text_input("First Name", key="first_name").strip()
-    middle_name = st.text_input("Middle Name (Optional)", key="middle_name").strip()
-    last_name = st.text_input("Last Name", key="last_name").strip()
+    cola1, cola2, cola3 = st.columns([1,1,1])
+    with cola1: first_name = st.text_input("First Name", key="first_name").strip()
+    with cola2: middle_name = st.text_input("Middle Name (Optional)", key="middle_name").strip()
+    with cola3: last_name = st.text_input("Last Name", key="last_name").strip()
 
     # Email Fields
-    email = st.text_input("Enter your email", key="email").strip()
-    confirm_email = st.text_input("Confirm your email", key="confirm_email").strip()
+    colb1, colb2 = st.columns([1,1])
+    with colb1: email = st.text_input("Enter your email", key="email", placeholder="example@example.com").strip()
+    with colb2: confirm_email = st.text_input("Confirm your email", key="confirm_email", placeholder="example@example.com").strip()
     
     # Password Fields
-    password = st.text_input("Enter your password", type="password", key="password").strip()
-    confirm_password = st.text_input("Confirm your password", type="password", key="confirm_password").strip()
+    colc1, colc2 = st.columns([1,1])
+    with colc1: password = st.text_input("Enter your password", type="password", key="password").strip()
+    with colc2: confirm_password = st.text_input("Confirm your password", type="password", key="confirm_password").strip()
 
     # Mobile Number
-    country_codes = ["+1", "+44", "+61", "+91", "+63", "+81", "+86"]  
-    country_code = st.selectbox("Country Code", country_codes, key="country_code")
-    mobile_number = st.text_input("Mobile Number", key="mobile_number").strip()
+    phone_code_url = "https://country.io/phone.json"
+    try:
+        response = requests.get(phone_code_url)
+        country_data = response.json()
+
+        country_codes = sorted([
+            f"{country} +{code.lstrip('+')}" 
+            for country, code in country_data.items()
+        ])
+    except Exception as e:
+        st.error(f"Failed to load country codes: {e}")
+        country_codes = ["US +1", "GB +44", "AU +61", "IN +91", "PH +63", "JP +81", "CN +86"]  # Fallback list
+
+    cold1, cold2 = st.columns([1,3])
+    with cold1: country_code = st.selectbox("Country Code", country_codes, key="country_code")
+    with cold2: mobile_number = st.text_input("Mobile Number", key="mobile_number", placeholder="9123456789").strip()
 
     # Address Field
     address = st.text_area("Enter your address (House No., Street, City, State, Zip Code, Country)", key="address").strip()
 
-    today = date.today()
-    min_birthday = today - timedelta(days=365 * 100)
-    max_birthday = today
+    cole1, cole2 = st.columns([1,1])
+    with cole1:
+        today = date.today()
+        min_birthday = today - timedelta(days=365 * 100)
+        max_birthday = today
 
-    birthday = st.date_input(
-        "Date of Birth",
-        key="birthday",
-        min_value=min_birthday,
-        max_value=max_birthday,
-        value=min_birthday  
-    )
+        birthday = st.date_input(
+            "Date of Birth",
+            key="birthday",
+            min_value=min_birthday,
+            max_value=max_birthday,
+            value=min_birthday  
+        )
+    with cole2: 
+        gender = st.selectbox(
+            "Gender",
+            [
+                "Male",
+                "Female",
+                "Non-binary",
+                "Agender",
+                "Genderfluid",
+                "Transgender Male",
+                "Transgender Female",
+                "Prefer to Self-Describe",
+                "Prefer Not to Say",
+                "Others",
+            ],
+            key="gender",
+        )
+
     uploaded_file = st.file_uploader("Upload personal picture", type=["png", "jpg", "jpeg"])
-    gender = st.selectbox("Gender", ["Select", "Male", "Female", "Other"], key="gender")
-
-    # Security Questions
-    security_questions = [
-        "What is your mother's maiden name?",
-        "What was the name of your grade 1 teacher?",
-        "What is the name of the town where you were born?",
-        "What was your childhood nickname?",
-        "What is your favorite book?",
-        "Who are you?"
-    ]
-    
-    selected_questions = []
-    question1 = st.selectbox("Security Question 1", security_questions, key="question1")
-    answer1 = st.text_input("Answer 1", type="password", key="answer1").strip()
-    selected_questions.append(question1)
-    question2 = st.selectbox("Security Question 2", [q for q in security_questions if q not in selected_questions], key="question2")
-    answer2 = st.text_input("Answer 2", type="password", key="answer2").strip()
-    selected_questions.append(question2)
-    question3 = st.selectbox("Security Question 3", [q for q in security_questions if q not in selected_questions], key="question3")
-    answer3 = st.text_input("Answer 3", type="password", key="answer3").strip()
 
     # Form validation
     if not first_name or not last_name or not re.match(r'^[A-Za-z ]+$', first_name) or not re.match(r'^[A-Za-z ]+$', last_name):
@@ -197,6 +238,8 @@ def to_signup():
         st.error("⚠️ Mobile number must be numeric.")
     elif gender == "Select":
         st.error("⚠️ Please select a gender.")
+    elif uploaded_file is None:
+        st.error("⚠️ Please select a photo.")
     else:
         if st.button("Create Account", key="signup_btn", use_container_width=True):
             try:
@@ -205,39 +248,22 @@ def to_signup():
                 auth_client.send_email_verification(user['idToken'])
                 user_id = user['localId']  # Unique ID of the user in Firebase Authentication
 
-                image_url = None
-                if uploaded_file is not None:
-                    # Convert image to bytes
+                if uploaded_file:
                     image = Image.open(uploaded_file)
-                    image_bytes = io.BytesIO()
-                    image.save(image_bytes, format="PNG")  # Convert to PNG format
-                    image_bytes.seek(0)
-
-                    # Upload to Firebase Storage
-                    bucket = storage.bucket()
-                    blob = bucket.blob(f"profile_pictures/{user_id}.png")  # Unique path for each user
-                    blob.upload_from_file(image_bytes, content_type="image/png")
-                    blob.make_public()  # Make image publicly accessible
-                    image_url = blob.public_url  # Get the public URL
-                
+                    # Upload to Cloudinary
+                    image_url = upload_to_cloudinary(image)
+                    
                 # Store user data in Firestore
                 user_data = {
                     "first_name": first_name,
-                    "middle_name": middle_name,
+                    "middle_name": middle_name + " ",
                     "last_name": last_name,
                     "email": email,
-                    "mobile_number": country_code + mobile_number,
+                    "country_code": country_code,
+                    "mobile_number": mobile_number,
                     "address": address,
                     "birthday": str(birthday),
                     "gender": gender,
-                    "security_questions": {
-                        "q1": question1,
-                        "a1": answer1,
-                        "q2": question2,
-                        "a2": answer2,
-                        "q3": question3,
-                        "a3": answer3,
-                    },
                     "profile_picture": image_url,
                     "created_at": firestore.SERVER_TIMESTAMP,  # Timestamp for when the account was created
                 }
@@ -245,7 +271,7 @@ def to_signup():
                 db.collection("users").document(user_id).set(user_data)  # Store user in Firestore
 
                 st.success("✅ Account created successfully! Please check your email for a verification link before logging in.")
-                time.sleep(2)
+                time.sleep(5)
                 st.session_state["page"] = "Login"
                 st.rerun()
             except Exception as e:
@@ -273,7 +299,7 @@ def to_forgot_password():
 
     email = st.text_input("Enter your registered email", placeholder="")
 
-    if st.button("Send Reset Email", key="reset_password", use_container_width=True):
+    if st.button("Send Password Reset Email", key="reset_password", use_container_width=True):
         try:
             auth_client.send_password_reset_email(email)
             st.success(f"✅ A password reset link has been sent to {email}. Check your inbox.")
@@ -292,6 +318,411 @@ def to_forgot_password():
 
     st.markdown('</div>', unsafe_allow_html=True)
 
+def get_user_data(user_email):
+    users_ref = db.collection("users")
+    query = users_ref.where("email", "==", user_email).get()
+
+    if query:
+        return query[0].to_dict()  
+    return None
+
+def update_user_data(user_email, updated_data):
+    users_ref = db.collection("users")
+    query = users_ref.where("email", "==", user_email).get()
+
+    if query:
+        doc_id = query[0].id  
+        users_ref.document(doc_id).update(updated_data)
+        return True
+    return False
+
+def to_analytics():
+    if "user" in st.session_state:
+        user = st.session_state["user"]
+
+        st.markdown('<hr class="style-two-grid">', unsafe_allow_html=True)
+        
+        try:
+            docs = db.collection("expenses").where("user", "==", user["email"]).stream()
+            expenses = [{**doc.to_dict(), "id": doc.id} for doc in docs]
+            
+            if expenses:
+                df = pd.DataFrame(expenses)
+                df["date"] = pd.to_datetime(df["date"])
+                
+                # Dropdown for selecting time frame
+
+                st.markdown("<center><h3>Your Analytics Dashboard</h3></center>", unsafe_allow_html=True)
+                time_frames = {"Current Month": 0, "Last Month": 1, "Last 3 Months": 3, "Last 6 Months": 6}
+                selected_timeframe = st.selectbox("Select Time Frame:", list(time_frames.keys()))
+                st.markdown("<br>", unsafe_allow_html=True)
+                months_ago = time_frames[selected_timeframe]
+                start_date = datetime.now().replace(day=1) - timedelta(days=30 * months_ago)
+                df_filtered = df[df["date"] >= start_date]
+                
+                total_expenses = df_filtered["amount"].sum()
+                daily_avg_spending = total_expenses / max(1, (datetime.now() - start_date).days)
+                
+                category_spending = df_filtered.groupby("category")["amount"].sum()
+                highest_category = category_spending.idxmax() if not category_spending.empty else "N/A"
+                highest_category_amount = category_spending.max() if not category_spending.empty else 0
+                
+                col1, col2, col3 = st.columns(3)
+                col1.metric("Total Expenses", f"₱ {total_expenses:,.2f}")
+                col2.metric("Daily Avg Spending", f"₱ {daily_avg_spending:,.2f}")
+                col3.metric("Top Category", f"{highest_category}")
+                st.divider()
+                
+                with st.expander("View Visual Analytics"):
+                    # Category Pie Chart
+                    if not category_spending.empty:
+                        fig, ax = plt.subplots(figsize=(6, 6))
+                        ax.pie(category_spending, labels=category_spending.index, autopct="%1.1f%%", startangle=140, colors=sns.color_palette("pastel"))
+                        ax.set_title("Category-wise Spending", fontsize=12, fontweight="bold")
+                        st.pyplot(fig)
+                        st.divider()
+                    
+                    # Expense Trend Line Chart
+                    df_filtered["date"] = df_filtered["date"].dt.date
+                    daily_trend = df_filtered.groupby("date")["amount"].sum()
+                    
+                    if not daily_trend.empty:
+                        fig, ax = plt.subplots(figsize=(8, 4))
+                        sns.lineplot(x=daily_trend.index, y=daily_trend.values, marker="o", ax=ax, color="royalblue")
+                        ax.set_title("Spending Trend Over Time", fontsize=14, fontweight="bold")
+                        ax.set_xlabel("Date")
+                        ax.set_ylabel("Amount Spent (₱)")
+                        ax.grid(True, linestyle="--", alpha=0.5)
+                        plt.xticks(rotation=45)
+                        st.pyplot(fig)
+                        st.divider()
+                    
+                    # Weekly Breakdown Bar Chart
+                    df_filtered["week"] = df_filtered["date"].apply(lambda x: x.strftime("%W"))
+                    weekly_spending = df_filtered.groupby("week")["amount"].sum()
+                    
+                    if not weekly_spending.empty:
+                        fig, ax = plt.subplots(figsize=(8, 4))
+                        sns.barplot(x=weekly_spending.index, y=weekly_spending.values, ax=ax, palette="coolwarm")
+                        ax.set_title("Weekly Spending Breakdown", fontsize=14, fontweight="bold")
+                        ax.set_xlabel("Week")
+                        ax.set_ylabel("Total Spending (₱)")
+                        st.pyplot(fig)
+                        st.divider()
+                
+                with st.expander("View Spending Habits Summary"):
+                    df_filtered["date"] = pd.to_datetime(df_filtered["date"], errors="coerce")
+                    st.markdown('<center><h3 style="margin-bottom:10px;">Detailed Summary of Your Spending Habits</h3></center>', unsafe_allow_html=True)
+
+                    def display_info(column, label, value, full_width=False):
+                        """Displays user information in a column or full-width."""
+                        formatted_value = value if value else no_data
+                        markdown = f"<p style='margin-bottom: 5px;'><b>{label} </b></p>"
+                        
+                        if full_width:
+                            st.markdown(markdown, unsafe_allow_html=True)
+                            st.success(formatted_value)
+                        else:
+                            column.markdown(markdown, unsafe_allow_html=True)
+                            column.success(formatted_value)
+
+                    # Overview
+                    st.markdown("<h5>Overall Spending Trends</h5>", unsafe_allow_html=True)
+                    no_data = "No data"
+                    col1, col2 = st.columns(2)
+                    display_info(col1, "Total Spending for the Selected Period", f"₱ {total_expenses:,.2f}")
+                    display_info(col1, "Number of Transactions", f"{len(df_filtered)}")
+                    display_info(col2, "Daily Average Spending", f"₱ {daily_avg_spending:,.2f}")
+                    highest_transaction = df_filtered.loc[df_filtered['amount'].idxmax()]  
+                    display_info(col2, "Highest Single Transaction", f"{highest_transaction['item_name']} (₱ {highest_transaction['amount']:,.2f})")
+                    st.divider()
+
+                    # Category Breakdown
+                    st.markdown("<h5>Category-Wise Spending</h5>", unsafe_allow_html=True)
+                    col3, col4 = st.columns(2)
+                    display_info(col3, "Highest Single Transaction", f"₱ {df_filtered['amount'].max():,.2f}")
+                    display_info(col4, "Most Expensive Category", f"{highest_category} (₱ {highest_category_amount:,.2f})")
+                    st.divider()
+                    st.markdown("<h5>Top 3 Categories with Highest Spending</h5>", unsafe_allow_html=True)
+                    top_categories = category_spending.nlargest(3)
+                    number = 1
+                    for category, amount in top_categories.items():
+                        col1, col2 = st.columns([1,1])  
+                        with col1:
+                            st.info(f"**{number} - {category}**")  
+                        with col2:
+                            st.success(f"₱ {amount:,.2f}") 
+                        number += 1
+                    st.divider()
+
+                    # Weekly Insights
+                    if not df_filtered["date"].isnull().all():
+                        df_filtered["week"] = df_filtered["date"].dt.strftime("%W")  # Convert to week number
+                        weekly_spending = df_filtered.groupby("week")["amount"].sum()
+
+                        st.markdown("<h5>Weekly Spending Patterns</h5>", unsafe_allow_html=True)
+                        col5, col6, col7 = st.columns([1,1,1])
+                        if not weekly_spending.empty:
+                            display_info(col5, "Highest Spent", f"Week {weekly_spending.idxmax()} (₱ {weekly_spending.max():,.2f})")
+                            display_info(col6, "Lowest Spent", f"Week {weekly_spending.idxmin()} (₱ {weekly_spending.min():,.2f})")
+                            display_info(col7, "Average Spent (Week)", f"₱ {weekly_spending.mean():,.2f}")
+                    st.divider()
+
+                    # Spending Behavior
+                    st.markdown("<h5>Spending Behavior Analysis</h5>", unsafe_allow_html=True)
+                    if len(df_filtered) > 1:
+                        avg_spending = df_filtered['amount'].mean()
+                        std_spending = df_filtered['amount'].std()
+                        median_spending = df_filtered['amount'].median()
+                        # Standard Deviation Analysis
+                        if std_spending > 0.75 * avg_spending:
+                            sd_interpretation = (
+                                "Your spending is highly inconsistent, with large fluctuations between purchases. "
+                                "This suggests impulsive spending habits or occasional big-ticket purchases that disrupt budgeting. "
+                                "Consider tracking high-value transactions to manage cash flow better."
+                            )
+                        elif std_spending < 0.25 * avg_spending:
+                            sd_interpretation = (
+                                "Your spending is highly stable, indicating consistent financial habits. "
+                                "This means you generally stick to a routine budget without major unexpected expenses. "
+                                "If intentional, this is a great sign of financial control."
+                            )
+                        else:
+                            sd_interpretation = (
+                                "Your spending pattern is moderately stable, with occasional variations. "
+                                "While you generally maintain consistent spending, some purchases deviate from the norm. "
+                                "Reviewing these variations can help fine-tune budgeting strategies."
+                            )
+                        # Median Transaction Analysis
+                        if median_spending < 0.5 * avg_spending:
+                            median_interpretation = (
+                                "The majority of your transactions are small, but a few high-value purchases significantly raise your average spending. "
+                                "This suggests a pattern of frequent small expenses combined with occasional major transactions. "
+                                "To maintain control, consider setting aside funds for these large purchases in advance."
+                            )
+                        elif median_spending > 1.5 * avg_spending:
+                            median_interpretation = (
+                                "You frequently engage in high-value transactions, suggesting a preference for larger purchases over small, frequent expenses. "
+                                "This could mean you invest in high-quality or bulk purchases rather than daily expenditures. "
+                                "Ensure these are planned to avoid financial strain."
+                            )
+                        else:
+                            median_interpretation = (
+                                "Your spending is balanced, meaning both small and large transactions occur in a relatively even distribution. "
+                                "This indicates a mix of daily expenses and occasional bigger purchases, reflecting a well-rounded spending habit."
+                            )
+                        # Display Results
+                        display_info(None, "Standard Deviation of Spending", f"₱ {std_spending:,.2f}", full_width=True)
+                        st.info(sd_interpretation)
+                        display_info(None, "Median Transaction Amount", f"₱ {median_spending:,.2f}", full_width=True)
+                        st.info(median_interpretation)
+                    else:
+                        st.info("Not enough transactions to analyze spending behavior.")
+                    st.divider()
+
+                    # Spending Frequency
+                    st.markdown("<h5>Frequency of Transactions</h5>", unsafe_allow_html=True)
+                    if not df_filtered.empty:
+                        most_frequent_category = df_filtered["category"].mode()[0]
+                        most_frequent_day = df_filtered["date"].mode()[0]  # Get the most frequent date
+                        most_frequent_day_str = most_frequent_day.strftime("%B %d, %Y")  
+                        most_frequent_day_total = df_filtered[df_filtered["date"] == most_frequent_day]["amount"].sum()  
+
+                        avg_transactions_per_day = len(df_filtered) / datetime.now().day
+                        total_spending = df_filtered["amount"].sum()
+
+                        col8, col9 = st.columns([1,1])
+                        display_info(col8, "Most Frequently Purchased Category", f"{most_frequent_category}")
+                        display_info(col8, "Average Transactions Per Day", f"{avg_transactions_per_day:.2f}")
+                        display_info(col9, "Day with the Most Spending", f"{most_frequent_day_str} (₱ {most_frequent_day_total:,.2f})")
+                        display_info(col9, "Total Spending", f"₱ {total_spending:,.2f}")
+                    else:
+                        st.info("No recorded transactions for frequency analysis")
+                    st.divider()
+                    
+                    # Data Table
+                    st.markdown("<h5>Expenses History</h5>", unsafe_allow_html=True)
+                    column_mapping = {"date": "Purchase Date", "item_name": "Item Name", "amount": "Amount (₱)", "category": "Category", "notes": "Notes"}
+                    df_filtered.rename(columns=column_mapping, inplace=True)
+                    df_filtered = df_filtered[list(column_mapping.values())]
+                    st.dataframe(df_filtered, height=560, use_container_width=True, hide_index=True)
+                
+            else:
+                st.info("ℹ️ No expenses recorded yet.")
+        except Exception as e:
+            st.error(f"❌ Error fetching expenses: {e}")
+
+        st.markdown('<hr class="style-two-grid">', unsafe_allow_html=True)
+        if st.button("Back to Dashboard", use_container_width=True):
+            st.session_state["page"] = "Dashboard"
+            st.rerun()
+    else:
+        st.warning("⚠️ Please log in to access the dashboard.")
+
+def to_profile():
+    if "user" in st.session_state:
+        user = st.session_state["user"]
+
+        user_query = db.collection("users").where("email", "==", user["email"]).limit(1).stream()
+        user_data = next(user_query, None)
+        user_email = user_data.to_dict().get("email", "User") if user_data else "User"
+
+        st.markdown('<div class="container">', unsafe_allow_html=True)
+        st.markdown('<div class="title">Profile & Information</div>', unsafe_allow_html=True)
+        st.markdown('<hr class="style-two-grid">', unsafe_allow_html=True)
+
+        user_data = get_user_data(user_email)
+
+        if user_data:
+            try:
+                st.markdown(
+                    f"""
+                    <div style="display: flex; justify-content: center;">
+                        <img src="{user_data['profile_picture']}" alt="Profile Picture" 
+                        style="max-width: 300px; max-height: 300px; border-radius: 10px; 
+                         margin-bottom: 30px; object-fit: contain;">
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            except Exception as e:
+                st.error(f"❌ Error fetching profile picture: {e}")
+
+            no_data = "No data"
+            col1, col2, col3 = st.columns(3)
+            col4, col5 = st.columns(2)
+            def display_info(column, label, value, full_width=False):
+                """Displays user information in a column or full-width."""
+                formatted_value = value if value else no_data
+                markdown = f"<p style='margin-bottom: 5px;'><b>{label}:</b></p>"
+                
+                if full_width:
+                    st.markdown(markdown, unsafe_allow_html=True)
+                    st.info(formatted_value)
+                else:
+                    column.markdown(markdown, unsafe_allow_html=True)
+                    column.info(formatted_value)
+
+            display_info(col1, "First Name", user_data["first_name"])
+            display_info(col2, "Middle Name", user_data["middle_name"])
+            display_info(col3, "Last Name", user_data["last_name"])
+            display_info(col4, "Gender", user_data["gender"])
+            display_info(col4, "Email Address", user_data["email"])
+            formatted_birthday = datetime.strptime(user_data["birthday"], "%Y-%m-%d").strftime("%B %d, %Y")
+            display_info(col5, "Date of Birth", formatted_birthday)
+            display_info(col5, "Mobile Number", f"{user_data['country_code']}{user_data['mobile_number']}")
+            display_info(None, "Address", user_data["address"], full_width=True)
+
+            col1, col2 = st.columns([1, 1])
+            # Editable fields
+            with st.expander("Edit Information"):
+                st.info("Want to change your password? Request a password reset email by clicking the button below.")
+
+                if st.button("Send Password Reset Email", key="reset_password", use_container_width=True):
+                    email_pass = user_data["email"]
+                    try:
+                        auth_client.send_password_reset_email(email_pass)
+                        st.success(f"✅ A password reset link has been sent to {email_pass}. Check your inbox.")
+                    except Exception as e:
+                        st.error("❌ Error sending reset email. Please try again.")
+                uploaded_file = st.file_uploader("Upload a new personal picture", type=["png", "jpg", "jpeg"])
+                colh1, colh2, colh3 = st.columns([1, 1, 1])
+                with colh1: 
+                    first_name = st.text_input("First Name", value=user_data["first_name"]).strip()
+                with colh2: 
+                    middle_name = st.text_input("Middle Name", value=user_data["middle_name"]).strip()
+                with colh3: 
+                    last_name = st.text_input("Last Name", value=user_data["last_name"]).strip()
+
+                coli1, coli2 = st.columns([1, 1])
+                with coli1:
+                    gender_options = [
+                        "Male", "Female", "Non-binary", "Agender", "Genderfluid", 
+                        "Transgender Male", "Transgender Female", "Prefer to Self-Describe", 
+                        "Prefer Not to Say", "Others"
+                    ]
+                    gender = st.selectbox("Gender", gender_options, index=gender_options.index(user_data["gender"]))
+                
+                with coli2:
+                    today = date.today()
+                    min_birthday = today - timedelta(days=365 * 100)
+                    max_birthday = today
+
+                    birthday = st.date_input(
+                        "Date of Birth",
+                        value=date.fromisoformat(user_data["birthday"]),
+                        min_value=min_birthday,
+                        max_value=max_birthday
+                    )
+
+                # Fetch country codes
+                phone_code_url = "https://country.io/phone.json"
+                try:
+                    response = requests.get(phone_code_url)
+                    country_data = response.json()
+                    country_codes = sorted([f"{country} +{code.lstrip('+')}" for country, code in country_data.items()])
+                except Exception as e:
+                    st.error(f"Failed to load country codes: {e}")
+                    country_codes = ["US +1", "GB +44", "AU +61", "IN +91", "PH +63", "JP +81", "CN +86"]  # Fallback list
+
+                cold1, cold2 = st.columns([1, 3])
+                with cold1:
+                    country_code = st.selectbox("Country Code", country_codes, key="country_code")
+                with cold2:
+                    mobile_number = st.text_input("Mobile Number", value=user_data["mobile_number"], key="mobile_number").strip()
+                
+                address = st.text_area("Enter your address (House No., Street, City, State, Zip Code, Country)", 
+                                    value=user_data["address"], key="address").strip()
+                
+                image_url = ""
+                if uploaded_file:
+                    image = Image.open(uploaded_file)
+                    # Upload to Cloudinary
+                    image_url = upload_to_cloudinary(image)
+                    
+                updated_data = {
+                    "first_name": first_name,
+                    "middle_name": middle_name,
+                    "last_name": last_name,
+                    "gender": gender,
+                    "birthday": str(birthday),
+                    "country_code": country_code,
+                    "mobile_number": mobile_number,
+                    "address": address,
+                    "profile_picture": image_url,
+                }
+
+                if st.button("Update Profile", use_container_width=True):
+                    if not first_name or not last_name or not re.match(r'^[A-Za-z ]+$', first_name) or not re.match(r'^[A-Za-z ]+$', last_name):
+                        st.error("⚠️ First and Last Name are required and must only contain letters and spaces.")
+                    elif not mobile_number or not mobile_number.isdigit():
+                        st.error("⚠️ Mobile number is required and must be numeric.")
+                    elif not address:
+                        st.error("⚠️ Address field is required.")
+                    elif gender not in gender_options:
+                        st.error("⚠️ Please select a valid gender.")
+                    else:
+                        if update_user_data(user_data["email"], updated_data):
+                            st.success("✅ Profile updated successfully!")
+                            time.sleep(2)
+                            st.rerun()
+                        else:
+                            st.error("❌ Failed to update profile.")                
+        else:
+            st.error("User data not found!")
+
+        st.markdown('<hr class="style-two-grid">', unsafe_allow_html=True)
+        colg1, colg2 = st.columns([1,1])
+        with colg1:
+            if st.button("Back to Dashboard", use_container_width=True):
+                st.session_state["page"] = "Dashboard"
+                st.rerun()
+        with colg2:
+            if st.button("Logout", use_container_width=True):
+                st.session_state.pop("user", None)
+                st.session_state["page"] = "Login"
+                st.rerun()  
+
 def to_dashboard():
     if "user" in st.session_state:
         user = st.session_state["user"]
@@ -305,24 +736,14 @@ def to_dashboard():
             first_name = "User"
 
         st.markdown('<div class="container">', unsafe_allow_html=True)
-        
-        st.markdown(f'<div class="title">Hello, {first_name}!</div>', unsafe_allow_html=True)
-        st.markdown('<hr class="style-two-grid">', unsafe_allow_html=True)
-
-        col1, col2 = st.columns([1,1])
-        with col1:
-            st.image(user_data["profile_picture"], caption="Profile Picture", use_column_width=True)
-
-        with col2:
-            st.image("header_bg.png", width=1000)
-
+        st.markdown(f'<div class="title">Welcome, {first_name}!</div>', unsafe_allow_html=True)
         st.markdown('<hr class="style-two-grid">', unsafe_allow_html=True)
 
         # Expense Input Form
         col1, col2 = st.columns([1, 1])
         with col1:
-            date = st.date_input("Purchase Date", datetime.date.today())
-            amount = st.number_input("Item Amount (₱)", min_value=0.01)
+            purchased_date = st.date_input("Purchase Date", date.today())
+            amount = st.number_input("Item Amount (₱)", min_value=0.0, step=0.01)
 
         with col2:
             item_name = st.text_input("Item Name", placeholder="Enter item name").strip()
@@ -342,11 +763,13 @@ def to_dashboard():
                 st.warning("⚠️ Please enter an item name.")
             elif not category:
                 st.warning("⚠️ Please select a category.")
+            elif amount <= 0:
+                st.warning("⚠️ Amount must be greater than 0.")
             else:
                 try:
                     db.collection("expenses").add({
                         "user": user["email"],
-                        "date": date.strftime("%Y-%m-%d"),
+                        "date": purchased_date.strftime("%Y-%m-%d"),
                         "amount": amount,
                         "item_name": item_name,
                         "category": category,
@@ -357,17 +780,13 @@ def to_dashboard():
                     st.error(f"❌ Error adding expense: {e}")
 
         st.markdown('<hr class="style-two-grid">', unsafe_allow_html=True)
-
-        st.subheader("Your Expenses")
+        st.subheader("Your Expenses History")
         try:
             docs = db.collection("expenses").where("user", "==", user["email"]).stream()
             expenses = [{**doc.to_dict(), "id": doc.id} for doc in docs]
 
             if expenses:
-                # Create DataFrame
                 df = pd.DataFrame(expenses)
-
-                # Rename Columns for Better Readability
                 column_mapping = {
                     "date": "Purchase Date",
                     "item_name": "Item Name",
@@ -376,16 +795,11 @@ def to_dashboard():
                     "notes": "Notes"
                 }
                 df.rename(columns=column_mapping, inplace=True)
-
-                # Define Column Order
                 df = df[list(column_mapping.values())]
-
-                # Display Table with Fixed Size and Scrollbar
-                st.data_editor(
+                st.dataframe(
                     df,
-                    height=400,  # Fixed table height (adjust as needed)
-                    width=700,   # Fixed table width (adjust as needed)
-                    use_container_width=False,
+                    height=560,
+                    use_container_width=True,  
                     hide_index=True
                 )
             else:
@@ -396,11 +810,24 @@ def to_dashboard():
         st.markdown('</div>', unsafe_allow_html=True)
         st.markdown('<hr class="style-two-grid">', unsafe_allow_html=True)
 
-        # **Logout Button**
-        if st.button("Logout", use_container_width=True):
-            st.session_state.pop("user", None)
-            st.session_state["page"] = "Login"
-            st.rerun()
+        col1, col2 = st.columns([1,1])
+        with col1:
+            if st.button("View Profile & Information", use_container_width=True):
+                st.session_state["page"] = "Profile"
+                st.rerun()
+
+        with col2:
+            if st.button("View Detailed Analytics", use_container_width=True):
+                st.session_state["page"] = "Analytics"
+                st.rerun()
+        
+        st.divider()
+        c1, c2, c3 = st.columns([1,2,1])
+        with c2:
+            if st.button("Logout", use_container_width=True):
+                    st.session_state.pop("user", None)
+                    st.session_state["page"] = "Login"
+                    st.rerun()  
     else:
         st.warning("⚠️ Please log in to access the dashboard.")
 
@@ -409,10 +836,9 @@ with col_image:
     st.image("header_bg.png", width=1000)
 
 # Sidebar Menu
-menu = ["Login", "Sign Up", "Forgot Password", "Dashboard"]
+menu = ["Login", "Sign Up", "Forgot Password", "Dashboard", "Analytics", "Profile"]
 if "page" not in st.session_state:
     st.session_state["page"] = "Login"
-
 if st.session_state["page"] == "Login":
     to_login()
 elif st.session_state["page"] == "Sign Up":
@@ -421,3 +847,7 @@ elif st.session_state["page"] == "Forgot Password":
     to_forgot_password()
 elif st.session_state["page"] == "Dashboard":
     to_dashboard()
+elif st.session_state["page"] == "Analytics":
+    to_analytics()
+elif st.session_state["page"] == "Profile":
+    to_profile()
