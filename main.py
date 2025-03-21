@@ -13,6 +13,15 @@ import requests
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pytz
+import os
+import subprocess
+
+# Install pyrebase4 if not installed
+try:
+    import pyrebase
+except ModuleNotFoundError:
+    subprocess.run(["pip", "install", "pyrebase4"])
+    import pyrebase  # Retry import after installing
 
 # Load Firebase Admin SDK 
 if not firebase_admin._apps:

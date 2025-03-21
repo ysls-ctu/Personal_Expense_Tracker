@@ -1,6 +1,7 @@
 streamlit
 firebase-admin
 pyrebase4
+pyrebase
 pandas
 pillow
 requests
