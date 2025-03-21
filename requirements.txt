@@ -1,1 +1,9 @@
+streamlit
 firebase-admin
+pyrebase4
+pandas
+pillow
+requests
+matplotlib
+seaborn
+pytz
