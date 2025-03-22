@@ -13,13 +13,22 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
-db = firestore.client()
-
-# Load Firebase config 
 def init_firebase():
     with open("firebase-config.json") as f:
         firebase_config = json.load(f)
-    return firebase_admin.initialize_app(firebase_config)
+    
+    # Initialize Firebase App
+    cred = credentials.Certificate(firebase_config)
+    
+    # Check if Firebase is already initialized
+    if not firebase_admin._apps:
+        firebase_admin.initialize_app(cred)
+
+# Call init_firebase() before using Firestore
+init_firebase()
+
+# Now, Firestore client can be used
+db = firestore.client()
 
 firebase = init_firebase()
 auth_client = firebase.auth()
