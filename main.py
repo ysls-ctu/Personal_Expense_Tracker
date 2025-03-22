@@ -11,16 +11,20 @@ import io
 import requests
 import matplotlib.pyplot as plt
 import seaborn as sns
+import os
 
 
 def init_firebase():
-    with open("firebase-config.json") as f:
-        firebase_config = json.load(f)
+    # Ensure the service account JSON file is available
+    firebase_config_path = "expense-tracker-9deb0-firebase-adminsdk-fbsvc-eb82ba1415.json"  # Change this to your actual file path
     
-    # Initialize Firebase App
-    cred = credentials.Certificate(firebase_config)
+    if not os.path.exists(firebase_config_path):
+        st.error("Firebase service account key not found. Please upload a valid key.")
+        return
     
-    # Check if Firebase is already initialized
+    cred = credentials.Certificate(firebase_config_path)
+    
+    # Avoid duplicate initialization
     if not firebase_admin._apps:
         firebase_admin.initialize_app(cred)
 
