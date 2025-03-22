@@ -1,7 +1,6 @@
 import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, firestore
-import pyrebase
 import pandas as pd
 from datetime import datetime, date, timedelta
 import time
@@ -20,7 +19,7 @@ db = firestore.client()
 def init_firebase():
     with open("firebase-config.json") as f:
         firebase_config = json.load(f)
-    return pyrebase.initialize_app(firebase_config)
+    return firebase_admin.initialize_app(firebase_config)
 
 firebase = init_firebase()
 auth_client = firebase.auth()
