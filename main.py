@@ -1,7 +1,7 @@
 import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, firestore
-import pyrebase4 as pyrebase
+import pyrebase
 import pandas as pd
 from datetime import datetime, date, timedelta
 import time
@@ -12,21 +12,7 @@ import io
 import requests
 import matplotlib.pyplot as plt
 import seaborn as sns
-import pytz
-import os
-import subprocess
 
-# Install pyrebase4 if not installed
-try:
-    import pyrebase
-except ModuleNotFoundError:
-    subprocess.run(["pip", "install", "pyrebase4"])
-    import pyrebase  # Retry import after installing
-
-# Load Firebase Admin SDK 
-if not firebase_admin._apps:
-    cred = credentials.Certificate("expense-tracker-9deb0-firebase-adminsdk-fbsvc-a24c7b4c6a.json")
-    firebase_admin.initialize_app(cred, {"storageBucket": "expense-tracker-9deb0.appspot.com"}) 
 
 db = firestore.client()
 
