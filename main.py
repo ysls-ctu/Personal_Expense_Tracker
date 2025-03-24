@@ -20,7 +20,7 @@ if not firebase_admin._apps:
         "type": st.secrets["firebase"]["type"],
         "project_id": st.secrets["firebase"]["project_id"],
         "private_key_id": st.secrets["firebase"]["private_key_id"],
-        "private_key": st.secrets["firebase"]["private_key"].replace("\\n", "\n"),  # Ensure correct formatting
+        "private_key": st.secrets["firebase"]["private_key"].replace("\\n", "\n"),
         "client_email": st.secrets["firebase"]["client_email"],
         "client_id": st.secrets["firebase"]["client_id"],
         "auth_uri": st.secrets["firebase"]["auth_uri"],
@@ -30,11 +30,13 @@ if not firebase_admin._apps:
         "universe_domain": st.secrets["firebase"]["universe_domain"],
     }
 
-    # Initialize Firebase Admin SDK
-    if not firebase_admin._apps:
-        cred = credentials.Certificate(firebase_creds)
-        firebase_admin.initialize_app(cred)
+    # Save to a temporary JSON file
+    with open("firebase_creds.json", "w") as f:
+        json.dump(firebase_creds, f)
 
+    # Initialize Firebase Admin SDK
+    cred = credentials.Certificate("firebase_creds.json")
+    firebase_admin.initialize_app(cred)
 
 db = firestore.client()
 
@@ -101,6 +103,7 @@ st.markdown(
 )
 
 def to_login():
+    
     st.markdown('<div class="container">', unsafe_allow_html=True)
     st.markdown('<hr class="style-two-grid">', unsafe_allow_html=True)
     st.markdown('<div class="title">Login</div>', unsafe_allow_html=True)
