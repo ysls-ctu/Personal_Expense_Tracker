@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pytz
 
-# check
+# check 1
 if not firebase_admin._apps:
     firebase_creds = {
         "type": st.secrets["firebase"]["type"],
