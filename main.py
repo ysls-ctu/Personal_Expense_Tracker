@@ -1,6 +1,7 @@
 import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, firestore
+import pyrebase
 import pandas as pd
 from datetime import datetime, date, timedelta
 import time
@@ -11,28 +12,20 @@ import io
 import requests
 import matplotlib.pyplot as plt
 import seaborn as sns
-import os
+import pytz
 
+# Load Firebase Admin SDK 
+if not firebase_admin._apps:
+    cred = credentials.Certificate("expense-tracker-9deb0-firebase-adminsdk-fbsvc-eb82ba1415.json")
+    firebase_admin.initialize_app(cred, {"storageBucket": "expense-tracker-9deb0.appspot.com"}) 
 
-def init_firebase():
-    # Ensure the service account JSON file is available
-    firebase_config_path = "expense-tracker-9deb0-firebase-adminsdk-fbsvc-eb82ba1415.json"  # Change this to your actual file path
-    
-    if not os.path.exists(firebase_config_path):
-        st.error("Firebase service account key not found. Please upload a valid key.")
-        return
-    
-    cred = credentials.Certificate(firebase_config_path)
-    
-    # Avoid duplicate initialization
-    if not firebase_admin._apps:
-        firebase_admin.initialize_app(cred)
-
-# Call init_firebase() before using Firestore
-init_firebase()
-
-# Now, Firestore client can be used
 db = firestore.client()
+
+# Load Firebase config 
+def init_firebase():
+    with open("firebase-config.json") as f:
+        firebase_config = json.load(f)
+    return pyrebase.initialize_app(firebase_config)
 
 firebase = init_firebase()
 auth_client = firebase.auth()
@@ -231,8 +224,8 @@ def to_signup():
     uploaded_file = st.file_uploader("Upload personal picture", type=["png", "jpg", "jpeg"])
 
     # Form validation
-    if not first_name or not last_name or not re.match(r'^[A-Za-z ]+$', first_name) or not re.match(r'^[A-Za-z ]+$', last_name):
-        st.error("⚠️ First and Last Name are required and must only contain letters and spaces.")
+    if not first_name or not last_name or not re.match(r'^[A-Za-z ]+$', first_name) or not re.match(r'^[A-Za-z ]+$', middle_name) or not re.match(r'^[A-Za-z ]+$', last_name):
+        st.error("⚠️ Names are required (excl. middle name) and must only contain letters and spaces.")
     elif email != confirm_email or not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', email):
         st.error("⚠️ Email addresses must match and be in a valid format.")
     elif len(password) < 10 or not re.search(r'[A-Z]', password) or not re.search(r'[a-z]', password) or not re.search(r'\d', password) or not re.search(r'[!@#$%^&*]', password):
@@ -355,7 +348,9 @@ def to_analytics():
             
             if expenses:
                 df = pd.DataFrame(expenses)
-                df["date"] = pd.to_datetime(df["date"])
+                df["date"] = pd.to_datetime(df["date"], errors="coerce")
+                df = df.dropna(subset=["date"])
+
                 
                 # Dropdown for selecting time frame
 
@@ -379,17 +374,47 @@ def to_analytics():
                 col2.metric("Daily Avg Spending", f"₱ {daily_avg_spending:,.2f}")
                 col3.metric("Top Category", f"{highest_category}")
                 st.divider()
+
+                # Monthly Spending Projection
+                projected_monthly_spending = daily_avg_spending * 30
+                col1, col2 = st.columns(2)
+                col1.metric("Projected Monthly Spending", f"₱ {projected_monthly_spending:,.2f}")
+
+                # Financial Health Score Calculation
+                if len(df_filtered) > 1:
+                    std_spending = df_filtered["amount"].std()
+                    median_spending = df_filtered["amount"].median()
+
+                    # Score Calculation (Simple out of 100)
+                    stability_factor = max(0, 100 - (std_spending / max(1, daily_avg_spending)) * 30)
+                    consistency_factor = max(0, 100 - abs(daily_avg_spending - median_spending) * 2)
+                    score = int((stability_factor + consistency_factor) / 2)
+
+                    col2.metric("Financial Health Score", f"{score}/100")
                 
+                    # Budgeting Advice
+                    st.markdown("<h5>💡 Budgeting Advice</h5>", unsafe_allow_html=True)
+
+                    if score > 75:
+                        st.success("Your spending is well-managed and consistent. Consider setting savings goals to further enhance your financial health.")
+                    elif score > 50:
+                        st.warning("Your spending habits are relatively stable, but there are occasional fluctuations. Try tracking high-value purchases to maintain balance.")
+                    else:
+                        st.error("Your spending is highly unpredictable. Consider setting a weekly budget and monitoring discretionary expenses.")
+
+                st.divider()
                 with st.expander("View Visual Analytics"):
                     # Category Pie Chart
                     if not category_spending.empty:
                         fig, ax = plt.subplots(figsize=(6, 6))
-                        ax.pie(category_spending, labels=category_spending.index, autopct="%1.1f%%", startangle=140, colors=sns.color_palette("pastel"))
+                        ax.pie(category_spending, labels=category_spending.index, autopct="%1.2f%%", startangle=140, colors=sns.color_palette("pastel"))
                         ax.set_title("Category-wise Spending", fontsize=12, fontweight="bold")
                         st.pyplot(fig)
                         st.divider()
                     
                     # Expense Trend Line Chart
+                    df_filtered["date"] = pd.to_datetime(df_filtered["date"], errors="coerce")
+                    df_filtered = df_filtered.dropna(subset=["date"])
                     df_filtered["date"] = df_filtered["date"].dt.date
                     daily_trend = df_filtered.groupby("date")["amount"].sum()
                     
@@ -547,6 +572,9 @@ def to_analytics():
                         st.info("No recorded transactions for frequency analysis")
                     st.divider()
                     
+                    df_filtered["date"] = pd.to_datetime(df_filtered["date"], errors="coerce")
+                    df_filtered["date"] = df_filtered["date"].dt.date
+
                     # Data Table
                     st.markdown("<h5>Expenses History</h5>", unsafe_allow_html=True)
                     column_mapping = {"date": "Purchase Date", "item_name": "Item Name", "amount": "Amount (₱)", "category": "Category", "notes": "Notes"}
@@ -558,6 +586,24 @@ def to_analytics():
                 st.info("ℹ️ No expenses recorded yet.")
         except Exception as e:
             st.error(f"❌ Error fetching expenses: {e}")
+
+        timestamp = datetime.now().strftime("%H%M%S.%y%m%d")
+        file_name = f"expenses_report.{timestamp}.csv"
+
+        # Convert DataFrame to CSV format (in-memory buffer)
+        csv_buffer = io.StringIO()
+        df_filtered.to_csv(csv_buffer, index=False)
+        csv_data = csv_buffer.getvalue()
+
+        dlcol1, dlcol2 = st.columns([2,1])
+        with dlcol2:
+            st.download_button(
+                label="Download Report (.csv)",
+                data=csv_data,
+                file_name=file_name,
+                mime="text/csv",
+                use_container_width=True,
+            )
 
         st.markdown('<hr class="style-two-grid">', unsafe_allow_html=True)
         if st.button("Back to Dashboard", use_container_width=True):
@@ -686,6 +732,8 @@ def to_profile():
                     image = Image.open(uploaded_file)
                     # Upload to Cloudinary
                     image_url = upload_to_cloudinary(image)
+                else:
+                    image_url = user_data["profile_picture"]
                     
                 updated_data = {
                     "first_name": first_name,
@@ -698,10 +746,10 @@ def to_profile():
                     "address": address,
                     "profile_picture": image_url,
                 }
-
+    
                 if st.button("Update Profile", use_container_width=True):
-                    if not first_name or not last_name or not re.match(r'^[A-Za-z ]+$', first_name) or not re.match(r'^[A-Za-z ]+$', last_name):
-                        st.error("⚠️ First and Last Name are required and must only contain letters and spaces.")
+                    if not first_name or not last_name or not re.match(r'^[A-Za-z ]+$', first_name) or not re.match(r'^[A-Za-z ]+$', middle_name) or not re.match(r'^[A-Za-z ]+$', last_name):
+                        st.error("⚠️ Names are required (excl. middle name) and must only contain letters and spaces.")
                     elif not mobile_number or not mobile_number.isdigit():
                         st.error("⚠️ Mobile number is required and must be numeric.")
                     elif not address:
