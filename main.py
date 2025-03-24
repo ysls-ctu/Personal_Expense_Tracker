@@ -110,7 +110,7 @@ firebase_creds = {
         "universe_domain": st.secrets["firebase"]["universe_domain"],
     }
 def to_login():
-    st.write(st.secrets["firebase"]["private_key"])
+    print(repr(st.secrets["firebase"]["private_key"]))
     st.markdown('<div class="container">', unsafe_allow_html=True)
     st.markdown('<hr class="style-two-grid">', unsafe_allow_html=True)
     st.markdown('<div class="title">Login</div>', unsafe_allow_html=True)
@@ -827,6 +827,22 @@ def to_dashboard():
 
         st.markdown('<div class="container">', unsafe_allow_html=True)
         st.markdown(f'<div class="title">Welcome, {first_name}!</div>', unsafe_allow_html=True)
+
+        ppcol1, ppcol2, ppcol3 = st.columns([2,1,2])
+        with ppcol2:
+            try:
+                st.markdown(
+                    f"""
+                        <div style="display: flex; justify-content: center;">
+                            <img src="{user['profile_picture']}" alt="Profile Picture" 
+                                style="width: 100px; height: 100px;  border-radius: 100px; object-fit: cover; border: solid #333 5px">
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+            except Exception as e:
+                st.error(f"❌ Error fetching profile picture: {e}")
+
         st.markdown('<hr class="style-two-grid">', unsafe_allow_html=True)
 
         # Expense Input Form
