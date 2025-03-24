@@ -10,4 +10,5 @@ pytz
 pycryptodome
 google-cloud-storage
 setuptools
+cryptography>=41.0.3
 
