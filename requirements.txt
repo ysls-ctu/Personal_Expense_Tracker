@@ -9,4 +9,5 @@ seaborn
 pytz
 pycryptodome
 google-cloud-storage
+setuptools
 
