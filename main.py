@@ -18,10 +18,9 @@ import pytz
 if not firebase_admin._apps:
     firebase_creds = {
         "type": st.secrets["firebase"]["type"],
-        "apiKey": st.secrets["firebase"]["apiKey"],
         "project_id": st.secrets["firebase"]["project_id"],
         "private_key_id": st.secrets["firebase"]["private_key_id"],
-        "private_key": st.secrets["firebase"]["private_key"].replace("\\n", "\n"),
+        "private_key": st.secrets["firebase"]["private_key"].replace("\\n", "\n"),  # Ensure correct formatting
         "client_email": st.secrets["firebase"]["client_email"],
         "client_id": st.secrets["firebase"]["client_id"],
         "auth_uri": st.secrets["firebase"]["auth_uri"],
@@ -30,9 +29,12 @@ if not firebase_admin._apps:
         "client_x509_cert_url": st.secrets["firebase"]["client_x509_cert_url"],
         "universe_domain": st.secrets["firebase"]["universe_domain"],
     }
-    
-    cred = credentials.Certificate(firebase_creds)
-    firebase_admin.initialize_app(cred, {"storageBucket": f"{firebase_creds['project_id']}.appspot.com"})
+
+    # Initialize Firebase Admin SDK
+    if not firebase_admin._apps:
+        cred = credentials.Certificate(firebase_creds)
+        firebase_admin.initialize_app(cred)
+
 
 db = firestore.client()
 
