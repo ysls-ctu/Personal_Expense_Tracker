@@ -20,7 +20,7 @@ if not firebase_admin._apps:
         "type": st.secrets["firebase"]["type"],
         "project_id": st.secrets["firebase"]["project_id"],
         "private_key_id": st.secrets["firebase"]["private_key_id"],
-        "private_key": "\n".join(st.secrets["firebase"]["private_key"].split("\\n")),
+        "private_key": st.secrets["firebase"]["private_key"].replace(r'\n', '\n'),
         "client_email": st.secrets["firebase"]["client_email"],
         "client_id": st.secrets["firebase"]["client_id"],
         "auth_uri": st.secrets["firebase"]["auth_uri"],
@@ -54,19 +54,6 @@ auth_client = firebase.auth()
 
 st.set_page_config(page_title="Personal Expense Tracker", page_icon="📊", layout="centered")
 
-firebase_creds = {
-        "type": st.secrets["firebase"]["type"],
-        "project_id": st.secrets["firebase"]["project_id"],
-        "private_key_id": st.secrets["firebase"]["private_key_id"],
-        "private_key": "\n".join(st.secrets["firebase"]["private_key"].split("\\n")),
-        "client_email": st.secrets["firebase"]["client_email"],
-        "client_id": st.secrets["firebase"]["client_id"],
-        "auth_uri": st.secrets["firebase"]["auth_uri"],
-        "token_uri": st.secrets["firebase"]["token_uri"],
-        "auth_provider_x509_cert_url": st.secrets["firebase"]["auth_provider_x509_cert_url"],
-        "client_x509_cert_url": st.secrets["firebase"]["client_x509_cert_url"],
-        "universe_domain": st.secrets["firebase"]["universe_domain"],
-    }
 # UI Styling
 st.markdown(
     """
@@ -111,7 +98,6 @@ st.markdown(
 )
 
 def to_login():
-    st.write(repr(firebase_creds["private_key"]))  # Debug if key format is correct
 
     st.markdown('<div class="container">', unsafe_allow_html=True)
     st.markdown('<hr class="style-two-grid">', unsafe_allow_html=True)
