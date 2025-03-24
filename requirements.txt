@@ -8,3 +8,5 @@ matplotlib
 seaborn
 pytz
 pycryptodome
+google-cloud-storage
+
