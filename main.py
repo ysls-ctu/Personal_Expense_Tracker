@@ -14,17 +14,38 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pytz
 
-# Load Firebase Admin SDK 
 if not firebase_admin._apps:
-    cred = credentials.Certificate("expense-tracker-9deb0-firebase-adminsdk-fbsvc-eb82ba1415.json")
-    firebase_admin.initialize_app(cred, {"storageBucket": "expense-tracker-9deb0.appspot.com"}) 
+    firebase_creds = {
+        "type": st.secrets["firebase"]["type"],
+        "project_id": st.secrets["firebase"]["project_id"],
+        "private_key_id": st.secrets["firebase"]["private_key_id"],
+        "private_key": st.secrets["firebase"]["private_key"].replace("\\n", "\n"),
+        "client_email": st.secrets["firebase"]["client_email"],
+        "client_id": st.secrets["firebase"]["client_id"],
+        "auth_uri": st.secrets["firebase"]["auth_uri"],
+        "token_uri": st.secrets["firebase"]["token_uri"],
+        "auth_provider_x509_cert_url": st.secrets["firebase"]["auth_provider_x509_cert_url"],
+        "client_x509_cert_url": st.secrets["firebase"]["client_x509_cert_url"],
+        "universe_domain": st.secrets["firebase"]["universe_domain"],
+    }
+    
+    cred = credentials.Certificate(firebase_creds)
+    firebase_admin.initialize_app(cred, {"storageBucket": f"{firebase_creds['project_id']}.appspot.com"})
 
 db = firestore.client()
 
-# Load Firebase config 
+# Load Firebase config for Pyrebase
 def init_firebase():
-    with open("firebase-config.json") as f:
-        firebase_config = json.load(f)
+    firebase_config = {
+        "apiKey": st.secrets["firebase"]["api_key"],  
+        "authDomain": f"{st.secrets['firebase']['project_id']}.firebaseapp.com",
+        "databaseURL": f"https://{st.secrets['firebase']['project_id']}.firebaseio.com",
+        "projectId": st.secrets["firebase"]["project_id"],
+        "storageBucket": f"{st.secrets['firebase']['project_id']}.appspot.com",
+        "messagingSenderId": st.secrets["firebase"]["client_id"],
+        "appId": st.secrets["firebase"].get("app_id", ""),
+        "measurementId": st.secrets["firebase"].get("measurement_id", "")
+    }
     return pyrebase.initialize_app(firebase_config)
 
 firebase = init_firebase()
