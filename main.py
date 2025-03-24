@@ -17,6 +17,7 @@ import pytz
 if not firebase_admin._apps:
     firebase_creds = {
         "type": st.secrets["firebase"]["type"],
+        "apiKey": st.secrets["firebase"]["apiKey"],
         "project_id": st.secrets["firebase"]["project_id"],
         "private_key_id": st.secrets["firebase"]["private_key_id"],
         "private_key": st.secrets["firebase"]["private_key"].replace("\\n", "\n"),
@@ -37,7 +38,7 @@ db = firestore.client()
 # Load Firebase config for Pyrebase
 def init_firebase():
     firebase_config = {
-        "apiKey": st.secrets["firebase"]["api_key"],  
+        "apiKey": st.secrets["firebase"]["apiKey"],  
         "authDomain": f"{st.secrets['firebase']['project_id']}.firebaseapp.com",
         "databaseURL": f"https://{st.secrets['firebase']['project_id']}.firebaseio.com",
         "projectId": st.secrets["firebase"]["project_id"],
