@@ -603,29 +603,30 @@ def to_analytics():
                     df_filtered.rename(columns=column_mapping, inplace=True)
                     df_filtered = df_filtered[list(column_mapping.values())]
                     st.dataframe(df_filtered, height=560, use_container_width=True, hide_index=True)
-                
+
+                    timestamp = datetime.now().strftime("%H%M%S.%y%m%d")
+                    file_name = f"expenses_report.{timestamp}.csv"
+
+                    # Convert DataFrame to CSV format (in-memory buffer)
+                    csv_buffer = io.StringIO()
+                    df_filtered.to_csv(csv_buffer, index=False)
+                    csv_data = csv_buffer.getvalue()
+
+                    dlcol1, dlcol2 = st.columns([2,1])
+                    with dlcol2:
+                        st.download_button(
+                            label="Download Report (.csv)",
+                            data=csv_data,
+                            file_name=file_name,
+                            mime="text/csv",
+                            use_container_width=True,
+                        )
             else:
                 st.info("ℹ️ No expenses recorded yet.")
         except Exception as e:
             st.error(f"❌ Error fetching expenses: {e}")
 
-        timestamp = datetime.now().strftime("%H%M%S.%y%m%d")
-        file_name = f"expenses_report.{timestamp}.csv"
-
-        # Convert DataFrame to CSV format (in-memory buffer)
-        csv_buffer = io.StringIO()
-        df_filtered.to_csv(csv_buffer, index=False)
-        csv_data = csv_buffer.getvalue()
-
-        dlcol1, dlcol2 = st.columns([2,1])
-        with dlcol2:
-            st.download_button(
-                label="Download Report (.csv)",
-                data=csv_data,
-                file_name=file_name,
-                mime="text/csv",
-                use_container_width=True,
-            )
+        
 
         st.markdown('<hr class="style-two-grid">', unsafe_allow_html=True)
         if st.button("Back to Dashboard", use_container_width=True):
