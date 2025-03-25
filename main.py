@@ -151,23 +151,58 @@ CLOUD_NAME = "dusq8j5cp"
 UPLOAD_PRESET = "unsigned_upload"
 CLOUDINARY_URL = f"https://api.cloudinary.com/v1_1/{CLOUD_NAME}/image/upload"
 
+
+# def upload_to_cloudinary(image):
+#     """Uploads an image to Cloudinary and returns the URL."""
+#     try:
+#         image = image.convert("RGB")
+#         max_size = 1024
+#         image.thumbnail((max_size, max_size))
+#         img_bytes = io.BytesIO()
+#         image.save(img_bytes, format="PNG")  # Save image as PNG
+#         img_bytes.seek(0)
+
+#         # Prepare request payload
+#         files = {"file": img_bytes}
+#         data = {"upload_preset": UPLOAD_PRESET}
+
+#         # Upload to Cloudinary
+#         response = requests.post(CLOUDINARY_URL, files=files, data=data)
+        
+#         if response.status_code == 200:
+#             return response.json().get("secure_url")  # Return the image URL
+#         else:
+#             st.error(f"Failed to upload image. Status code: {response.status_code}, Response: {response.text}")
+#             return None
+#     except Exception as e:
+#         st.error(f"Image processing or upload error: {e}")
+#         return None
+
+
 def upload_to_cloudinary(image):
     """Uploads an image to Cloudinary and returns the URL."""
-    img_bytes = io.BytesIO()
-    image.save(img_bytes, format="PNG")  # Save image as PNG
-    img_bytes.seek(0)
+    try:
+        image = image.convert("RGB")
+        max_size = 1024
+        image.thumbnail((max_size, max_size))
+        img_bytes = io.BytesIO()
+        image.save(img_bytes, format="PNG")  # Save image as PNG
+        img_bytes.seek(0)
 
-    # Prepare request payload
-    files = {"file": img_bytes}
-    data = {"upload_preset": UPLOAD_PRESET}
+        # Prepare request payload
+        files = {"file": img_bytes}
+        data = {"upload_preset": UPLOAD_PRESET}
 
-    # Upload to Cloudinary
-    response = requests.post(CLOUDINARY_URL, files=files, data=data)
-    
-    if response.status_code == 200:
-        return response.json().get("secure_url")  # Return the image URL
-    else:
-        st.error("Failed to upload image.")
+        # Upload to Cloudinary
+        response = requests.post(CLOUDINARY_URL, files=files, data=data)
+        
+        if response.status_code == 200:
+            return response.json().get("secure_url")  # Return the image URL
+        else:
+            st.error("Failed to upload image.")
+            return None
+    except:
+        st.error(f"Image processing or upload error: {e}")
         return None
 
 def to_signup():
@@ -245,36 +280,37 @@ def to_signup():
 
     uploaded_file = st.file_uploader("Upload personal picture", type=["png", "jpg", "jpeg"])
 
-    # Form validation
-    if not first_name or not last_name or not re.match(r'^[A-Za-z ]+$', first_name) or not re.match(r'^[A-Za-z ]+$', middle_name) or not re.match(r'^[A-Za-z ]+$', last_name):
-        st.error("⚠️ Names are required (excl. middle name) and must only contain letters and spaces.")
-    elif email != confirm_email or not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', email):
-        st.error("⚠️ Email addresses must match and be in a valid format.")
-    elif len(password) < 10 or not re.search(r'[A-Z]', password) or not re.search(r'[a-z]', password) or not re.search(r'\d', password) or not re.search(r'[!@#$%^&*]', password):
-        st.error("⚠️ Password must be at least 10 characters long and include an uppercase letter, lowercase letter, number, and special character.")
-    elif password != confirm_password:
-        st.error("⚠️ Passwords do not match!")
-    elif not address:
-        st.error("⚠️ Address field is required.")
-    elif not mobile_number or not mobile_number.isdigit():
-        st.error("⚠️ Mobile number must be numeric.")
-    elif gender == "Select":
-        st.error("⚠️ Please select a gender.")
-    elif uploaded_file is None:
-        st.error("⚠️ Please select a photo.")
-    else:
-        if st.button("Create Account", key="signup_btn", use_container_width=True):
+    if st.button("Create Account", key="signup_btn", use_container_width=True):
+        # Form validation
+        if not first_name or not last_name or not re.match(r'^[A-Za-z ]+$', first_name) or not re.match(r'^[A-Za-z ]+$', middle_name) or not re.match(r'^[A-Za-z ]+$', last_name):
+            st.error("⚠️ Names are required (excl. middle name) and must only contain letters and spaces.")
+        elif email != confirm_email or not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', email):
+            st.error("⚠️ Email addresses must match and be in a valid format.")
+        elif len(password) < 10 or not re.search(r'[A-Z]', password) or not re.search(r'[a-z]', password) or not re.search(r'\d', password) or not re.search(r'[!@#$%^&*]', password):
+            st.error("⚠️ Password must be at least 10 characters long and include an uppercase letter, lowercase letter, number, and special character.")
+        elif password != confirm_password:
+            st.error("⚠️ Passwords do not match!")
+        elif not address:
+            st.error("⚠️ Address field is required.")
+        elif not mobile_number or not mobile_number.isdigit():
+            st.error("⚠️ Mobile number must be numeric.")
+        elif gender == "Select":
+            st.error("⚠️ Please select a gender.")
+        elif uploaded_file is None:
+            st.error("⚠️ Please select a photo.")
+        else:
             try:
                 # Create user in Firebase Authentication
                 user = auth_client.create_user_with_email_and_password(email, password)
                 auth_client.send_email_verification(user['idToken'])
                 user_id = user['localId']  # Unique ID of the user in Firebase Authentication
 
+                image_url = "https://asset.cloudinary.com/dusq8j5cp/c1bf196c3926aa24dd325f611192b0b3"
                 if uploaded_file:
                     image = Image.open(uploaded_file)
                     # Upload to Cloudinary
                     image_url = upload_to_cloudinary(image)
-                    
+                        
                 # Store user data in Firestore
                 user_data = {
                     "first_name": first_name,
