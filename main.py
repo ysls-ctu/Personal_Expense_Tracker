@@ -13,6 +13,7 @@ import requests
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pytz
+from google.cloud.firestore import SERVER_TIMESTAMP
 
 # check 1
 if not firebase_admin._apps:
@@ -490,9 +491,7 @@ def to_analytics():
                 df["date"] = pd.to_datetime(df["date"], errors="coerce")
                 df = df.dropna(subset=["date"])
 
-                
                 # Dropdown for selecting time frame
-
                 st.markdown("<center><h3>Your Analytics Dashboard</h3></center>", unsafe_allow_html=True)
                 time_frames = {"Current Month": 0, "Last Month": 1, "Last 3 Months": 3, "Last 6 Months": 6}
                 selected_timeframe = st.selectbox("Select Time Frame:", list(time_frames.keys()))
@@ -900,7 +899,6 @@ def to_profile():
                         }
                         if update_user_data(user_data["email"], updated_data):
                             st.success("✅ Profile updated successfully!")
-                            uploaded_file = None
                             time.sleep(2)
                             st.rerun()
                         else:
@@ -920,6 +918,24 @@ def to_profile():
                 st.session_state["page"] = "Login"
                 st.rerun()  
 
+def reset_form():
+    st.session_state.purchased_date = date.today()
+    st.session_state.amount = 0.00
+    st.session_state.item_name = ""
+    st.session_state.category = "Grocery"
+    st.session_state.notes = ""
+
+if "purchased_date" not in st.session_state:
+    st.session_state.purchased_date = date.today()
+if "amount" not in st.session_state:
+    st.session_state.amount = 0.00
+if "item_name" not in st.session_state:
+    st.session_state.item_name = ""
+if "category" not in st.session_state:
+    st.session_state.category = "Grocery"
+if "notes" not in st.session_state:
+    st.session_state.notes = ""
+    
 def to_dashboard():
     if "user" in st.session_state:
         user = st.session_state["user"]
@@ -956,54 +972,89 @@ def to_dashboard():
 
         st.markdown('<hr class="style-two-grid">', unsafe_allow_html=True)
 
-        # Expense Input Form
         col1, col2 = st.columns([1, 1])
+
         with col1:
-            purchased_date = st.date_input("Purchase Date", date.today())
-            amount = st.number_input("Item Amount (₱)", min_value=0.0, step=0.01)
+            st.date_input("Purchase Date", key="purchased_date")
+            st.number_input("Item Amount (₱)", min_value=0.0, step=0.01, key="amount")
 
         with col2:
-            item_name = st.text_input("Item Name", placeholder="Enter item name").strip()
-            category = st.selectbox("Item Category", [
+            st.text_input("Item Name", placeholder="Enter item name", key="item_name")
+            st.selectbox("Item Category", [
                 "Grocery", "Eat Out", "Transportation", "Entertainment", "Donation", "Education", 
                 "Personal Care", "Health & Wellness", "Bills & Utilities", "Travel", "Subscription", 
                 "Debt Payment", "Others"
-            ])
+            ], key="category")
 
-        notes = st.text_area("Notes (Optional)", key="notes").strip()
+        st.text_area("Notes (Optional)", key="notes")
 
         st.markdown('<br>', unsafe_allow_html=True)
-        
-        # **Ensure Required Fields Are Filled**
+
+        # Button logic
         if st.button("Add Expense", use_container_width=True):
-            if not item_name:
+            if not st.session_state.item_name:
                 st.warning("⚠️ Please enter an item name.")
-            elif not category:
+            elif not st.session_state.category:
                 st.warning("⚠️ Please select a category.")
-            elif amount <= 0:
+            elif st.session_state.amount <= 0:
                 st.warning("⚠️ Amount must be greater than 0.")
             else:
                 try:
                     db.collection("expenses").add({
                         "user": user["email"],
-                        "date": purchased_date.strftime("%Y-%m-%d"),
-                        "amount": amount,
-                        "item_name": item_name,
-                        "category": category,
-                        "notes": notes  
+                        "date": st.session_state.purchased_date.strftime("%Y-%m-%d"),
+                        "amount": st.session_state.amount,
+                        "item_name": st.session_state.item_name,
+                        "category": st.session_state.category,
+                        "notes": st.session_state.notes  
                     })
+
                     st.success("✅ Expense added successfully!")
+                    rcol1,rcol2,rcol3 = st.columns([1,1,1])
+                    with rcol2: st.button("Reset Form", on_click=reset_form, use_container_width=True)
+
                 except Exception as e:
                     st.error(f"❌ Error adding expense: {e}")
 
         st.markdown('<hr class="style-two-grid">', unsafe_allow_html=True)
         st.subheader("Your Expenses History")
+        # try:
+        #     docs = db.collection("expenses").where("user", "==", user["email"]).stream()
+        #     expenses = [{**doc.to_dict(), "id": doc.id} for doc in docs]
+
+        #     if expenses:
+        #         df = pd.DataFrame(expenses)
+        #         column_mapping = {
+        #             "date": "Purchase Date",
+        #             "item_name": "Item Name",
+        #             "amount": "Amount (₱)",
+        #             "category": "Category",
+        #             "notes": "Notes"
+        #         }
+        #         df.rename(columns=column_mapping, inplace=True)
+        #         df = df[list(column_mapping.values())]
+        #         st.data_editor(
+        #             df,
+        #             height=560,
+        #             use_container_width=True,  
+        #             hide_index=True
+        #         )
+        #     else:
+        #         st.info("ℹ️ No expenses recorded yet.")
+        # except Exception as e:
+        #     st.error(f"❌ Error fetching expenses: {e}")
+
+        # if st.button("🔄 Refresh"):
+        #     st.experimental_rerun() 
         try:
+            # Fetch expenses from Firestore
             docs = db.collection("expenses").where("user", "==", user["email"]).stream()
             expenses = [{**doc.to_dict(), "id": doc.id} for doc in docs]
 
             if expenses:
                 df = pd.DataFrame(expenses)
+
+                # Rename columns for better readability
                 column_mapping = {
                     "date": "Purchase Date",
                     "item_name": "Item Name",
@@ -1012,15 +1063,67 @@ def to_dashboard():
                     "notes": "Notes"
                 }
                 df.rename(columns=column_mapping, inplace=True)
-                df = df[list(column_mapping.values())]
-                st.dataframe(
-                    df,
+
+                # Exclude 'last_updated' column from the displayed table
+                if "last_updated" in df.columns:
+                    df.drop(columns=["last_updated"], inplace=True)
+
+                df = df[list(column_mapping.values()) + ["id"]]  # Keep ID for updates
+
+                edited_df = st.data_editor(
+                    df.drop(columns=["id"]),  
                     height=560,
-                    use_container_width=True,  
-                    hide_index=True
+                    use_container_width=True,
+                    hide_index=True,
                 )
+
+                # Detect changes and update Firestore
+                if "edited_expenses" not in st.session_state:
+                    st.session_state.edited_expenses = df.copy()
+
+                if not edited_df.equals(st.session_state.edited_expenses):
+                    st.session_state.edited_expenses = edited_df.copy()
+                    
+                    updates = {}  # Store only changed rows
+                    for i, row in edited_df.iterrows():
+                        original_row = df.loc[i]  # Get original data
+                        doc_id = original_row["id"]
+
+                        # Check which fields were changed
+                        updated_fields = {
+                            "last_updated": SERVER_TIMESTAMP  # Add timestamp for every update
+                        }
+                        if row["Amount (₱)"] != original_row["Amount (₱)"]:
+                            updated_fields["amount"] = row["Amount (₱)"]
+                        if row["Category"] != original_row["Category"]:
+                            updated_fields["category"] = row["Category"]
+                        if row["Purchase Date"] != original_row["Purchase Date"]:
+                            updated_fields["date"] = row["Purchase Date"]
+                        if row["Item Name"] != original_row["Item Name"]:
+                            updated_fields["item_name"] = row["Item Name"]
+                        if row["Notes"] != original_row["Notes"]:
+                            updated_fields["notes"] = row["Notes"]
+
+                        if len(updated_fields) > 1:  # Only update if fields changed
+                            updates[doc_id] = updated_fields  
+
+                    if updates:
+                        batch = db.batch()
+                        for doc_id, fields in updates.items():
+                            doc_ref = db.collection("expenses").document(doc_id)
+                            batch.update(doc_ref, fields)
+                        batch.commit()  # Send all updates at once
+                        st.success("✅ Changes saved successfully!")
+
+                        ref1, ref2, ref3 = st.columns([1,3,1])
+                        # Refresh button to reload table after saving
+                        with ref2:
+                            if st.button("🔄 Refresh Table", use_container_width=True):
+                                st.experimental_rerun()
+
             else:
                 st.info("ℹ️ No expenses recorded yet.")
+
         except Exception as e:
             st.error(f"❌ Error fetching expenses: {e}")
 
