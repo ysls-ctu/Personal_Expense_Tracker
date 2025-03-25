@@ -92,6 +92,9 @@ st.markdown(
             background: #333;
             background-image: linear-gradient(to right, #ccc, black, #ccc);
         }
+        .hyperlink {
+            text-decoration: none !important;
+        }
     </style>
     """,
     unsafe_allow_html=True,
@@ -251,68 +254,174 @@ def to_signup():
         )
 
     uploaded_file = st.file_uploader("Upload personal picture", type=["png", "jpg", "jpeg"])
+    st.markdown(
+        """<div style=""><br>By creating an account, you agree to our <b>Terms and Conditions</b> and <b>Privacy Policy</b>, 
+            and you consent to <b><a class="hyperlink" href="https://github.com/ysls-ctu">YSLS</a></b> storing and processing your personal data in accordance with 
+            the <b><a class="hyperlink" href="https://privacy.gov.ph/data-privacy-act/">Republic Act 10173 - Data Privacy Act of 2012</a></b>.<br></div>""", unsafe_allow_html=True
+    )
+    "\n"
+    agreed_to_terms = st.checkbox("I agree to the Terms & Conditions and Privacy Policy", key="terms")
+    termscol1, termscol2 = st.columns([1,1])
+    with termscol1: 
+        with st.expander("View Terms and Conditions"):
+            st.markdown("### Terms and Conditions")
+            st.markdown("""
+            This document outlines the rules users must agree to before using the Personal Expense Tracker.
+            <ol>
+                <li><b>Acceptance of Terms</b>
+                <br>By signing up, you agree to abide by these Terms and Conditions. If you do not agree, you must not use this application.</li>
+                <li><b>Account Registration</b>
+                <ul>
+                    <li>Users must provide accurate personal information.</li>
+                    <li>Users are responsible for maintaining the confidentiality of their login credentials.</li>
+                    <li>The developer (YSLS) reserves the right to suspend or terminate accounts that violate these terms.</li>
+                </ul></li>
+                <li><b>Data Storage & Processing</b>
+                <ul>
+                    <li>The app collects and stores names, email addresses, mobile numbers, addresses, birthdays, and profile pictures for account creation and service functionality.</li>
+                    <li>Data is securely stored in Firebase and is only used for account management and personalization.</li>
+                    <li>The developer (YSLS) will not sell or share your data with third parties for marketing purposes.</li>
+                </ul></li>
+                <li><b>User Responsibilities</b>
+                <ul>
+                    <li>Users must ensure their account security and not share login credentials.</li>
+                    <li>Users must not misuse the app for illegal activities.</li>
+                    <li>Any attempt to breach the security or functionality of the application may result in legal action.</li>
+                </ul></li>
+                <li><b>Disclaimer of Liability</b>
+                <ul>
+                    <li>The developer (YSLS) provides the app "as-is" without warranties regarding accuracy, reliability, or availability.</li>
+                    <li>The app is designed for personal expense tracking only and should not be relied upon for financial or legal decisions.</li>
+                </ul></li>
+                <li><b>Termination of Account</b>
+                <ul>
+                    <li>The developer (YSLS) reserves the right to terminate accounts that violate terms, engage in fraud, or pose security risks.</li>
+                    <li>Users may request account deletion at any time.</li>
+                </ul></li>
+                <li><b>Amendments</b>
+                <ul>
+                    <li>The developer (YSLS) may update these Terms and Conditions. Continued use of the app signifies acceptance of any modifications.</li>
+                </ul></li><br>
+            </ol>
+        """, unsafe_allow_html=True)
+    with termscol2:
+        with st.expander("View Privacy Policy"):
+            st.markdown("### Privacy Policy")
+            st.markdown("""
+            This policy explains how your personal data is collected, used, and protected in compliance with the Republic Act 10173 - Data Privacy Act of 2012.
+            <ol>
+                <li><b>Data Collected</b>
+                <br>When signing up, we collect:
+                <ul>
+                    <li>Personal Information: Full name, email, phone number, address, birthday, gender.
+                    <li>Profile Picture: Uploaded images for personalization.
+                    <li>Device & Usage Data: IP address, browser type, and interactions with the app.
+                </ul>
+                <li><b>Purpose of Data Collection</b>
+                <br>Your data is collected to:
+                <ul>
+                    <li>Create and manage your account.
+                    <li>Securely authenticate users.
+                    <li>Personalize and enhance the user experience.
+                    <li>Ensure compliance with security regulations.
+                </ul>
+                <li><b>Data Protection & Security</b>
+                <ul>
+                    <li>All personal data is stored securely in Firebase.
+                    <li>We implement encryption, access control, and secure authentication.
+                    <li>We never sell user data to third parties.
+                </ul>
+                <li><b>Data Sharing</b>
+                <br>Your data may be shared only under the following conditions:
+                <ul>
+                    <li>Legal Compliance: If required by law or government authorities.
+                    <li>Service Improvement: With third-party services only for app functionality (e.g., Firebase, Cloudinary).
+                </ul>
+                <li><b>User Rights</b>
+                <br>Under the Data Privacy Act of the Philippines, you have the right to:
+                <ul>
+                    <li>Access the personal data stored about you.
+                    <li>Request Correction of inaccurate data.
+                    <li>Request Deletion of your account and personal data.
+                    <li>Withdraw Consent at any time.
+                </ul>
+                <li><b>Data Retention</b>
+                <ul>
+                    <li>We retain user data only as long as necessary for service functionality.
+                    <li>Users may request data deletion via the account settings.
+                </ul>
+                <li><b>Changes to this Policy</b>
+                <ul>
+                    <li>We may update this Privacy Policy as needed. Users will be notified of significant changes.
+                </ul><br>
+            </ol>
+        """, unsafe_allow_html=True
+        )
 
     if st.button("Create Account", key="signup_btn", use_container_width=True):
-        # Form validation
-        if not first_name or not last_name or not re.match(r'^[A-Za-z ]+$', first_name) or not re.match(r'^[A-Za-z ]+$', middle_name) or not re.match(r'^[A-Za-z ]+$', last_name):
-            st.error("⚠️ Names are required (excl. middle name) and must only contain letters and spaces.")
-        elif email != confirm_email or not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', email):
-            st.error("⚠️ Email addresses must match and be in a valid format.")
-        elif len(password) < 10 or not re.search(r'[A-Z]', password) or not re.search(r'[a-z]', password) or not re.search(r'\d', password) or not re.search(r'[!@#$%^&*]', password):
-            st.error("⚠️ Password must be at least 10 characters long and include an uppercase letter, lowercase letter, number, and special character.")
-        elif password != confirm_password:
-            st.error("⚠️ Passwords do not match!")
-        elif not address:
-            st.error("⚠️ Address field is required.")
-        elif not mobile_number or not mobile_number.isdigit():
-            st.error("⚠️ Mobile number must be numeric.")
-        elif gender == "Select":
-            st.error("⚠️ Please select a gender.")
-        elif uploaded_file is None:
-            st.error("⚠️ Please select a photo.")
-        else:
-            try:
-                # Create user in Firebase Authentication
-                user = auth_client.create_user_with_email_and_password(email, password)
-                auth_client.send_email_verification(user['idToken'])
-                user_id = user['localId']  # Unique ID of the user in Firebase Authentication
+        if agreed_to_terms:
+            # Form validation
+            if not first_name or not last_name or not re.match(r'^[A-Za-z ]+$', first_name) or not re.match(r'^[A-Za-z ]+$', middle_name) or not re.match(r'^[A-Za-z ]+$', last_name):
+                st.error("⚠️ Names are required (excl. middle name) and must only contain letters and spaces.")
+            elif email != confirm_email or not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', email):
+                st.error("⚠️ Email addresses must match and be in a valid format.")
+            elif len(password) < 10 or not re.search(r'[A-Z]', password) or not re.search(r'[a-z]', password) or not re.search(r'\d', password) or not re.search(r'[!@#$%^&*]', password):
+                st.error("⚠️ Password must be at least 10 characters long and include an uppercase letter, lowercase letter, number, and special character.")
+            elif password != confirm_password:
+                st.error("⚠️ Passwords do not match!")
+            elif not address:
+                st.error("⚠️ Address field is required.")
+            elif not mobile_number or not mobile_number.isdigit():
+                st.error("⚠️ Mobile number must be numeric.")
+            elif gender == "Select":
+                st.error("⚠️ Please select a gender.")
+            elif uploaded_file is None:
+                st.error("⚠️ Please select a photo.")
+            else:
+                try:
+                    # Create user in Firebase Authentication
+                    user = auth_client.create_user_with_email_and_password(email, password)
+                    auth_client.send_email_verification(user['idToken'])
+                    user_id = user['localId']  # Unique ID of the user in Firebase Authentication
 
-                image_url = "https://asset.cloudinary.com/dusq8j5cp/c1bf196c3926aa24dd325f611192b0b3"
-                if uploaded_file:
-                    image = Image.open(uploaded_file)
-                    # Upload to Cloudinary
-                    image_url = upload_to_cloudinary(image)
-                        
-                # Store user data in Firestore
-                user_data = {
-                    "first_name": first_name,
-                    "middle_name": middle_name + " ",
-                    "last_name": last_name,
-                    "email": email,
-                    "country_code": country_code,
-                    "mobile_number": mobile_number,
-                    "address": address,
-                    "birthday": str(birthday),
-                    "gender": gender,
-                    "profile_picture": image_url,
-                    "created_at": firestore.SERVER_TIMESTAMP,  # Timestamp for when the account was created
-                }
+                    image_url = "https://asset.cloudinary.com/dusq8j5cp/c1bf196c3926aa24dd325f611192b0b3"
+                    if uploaded_file:
+                        image = Image.open(uploaded_file)
+                        # Upload to Cloudinary
+                        image_url = upload_to_cloudinary(image)
+                            
+                    # Store user data in Firestore
+                    user_data = {
+                        "first_name": first_name,
+                        "middle_name": middle_name + " ",
+                        "last_name": last_name,
+                        "email": email,
+                        "country_code": country_code,
+                        "mobile_number": mobile_number,
+                        "address": address,
+                        "birthday": str(birthday),
+                        "gender": gender,
+                        "profile_picture": image_url,
+                        "created_at": firestore.SERVER_TIMESTAMP,  # Timestamp for when the account was created
+                    }
 
-                db.collection("users").document(user_id).set(user_data)  # Store user in Firestore
+                    db.collection("users").document(user_id).set(user_data)  # Store user in Firestore
 
-                st.success("✅ Account created successfully! Please check your email for a verification link before logging in.")
-                time.sleep(5)
-                st.session_state["page"] = "Login"
-                st.rerun()
-            except Exception as e:
-                error_message = str(e)
-                if "EMAIL_EXISTS" in error_message:
-                    st.error("⚠️ This email is already registered. Please log in.")
-                    time.sleep(2)
+                    st.success("✅ Account created successfully! Please check your email for a verification link before logging in.")
+                    time.sleep(5)
                     st.session_state["page"] = "Login"
                     st.rerun()
-                else:
-                    st.error(f"❌ Error: {error_message}")
+                except Exception as e:
+                    error_message = str(e)
+                    if "EMAIL_EXISTS" in error_message:
+                        st.error("⚠️ This email is already registered. Please log in.")
+                        time.sleep(2)
+                        st.session_state["page"] = "Login"
+                        st.rerun()
+                    else:
+                        st.error(f"❌ Error: {error_message}")
+        else:
+            st.error("⚠️ You must agree to the Terms & Conditions and Privacy Policy to proceed.")
 
     st.markdown('<hr class="style-two-grid">', unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 1, 1])
