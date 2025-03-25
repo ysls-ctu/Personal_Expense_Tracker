@@ -124,7 +124,7 @@ def to_login():
                     st.session_state["page"] = "Dashboard"
                     st.rerun()
                 else:
-                    st.error("❌ User data not found. Please contact support.")
+                    st.error("❌ User data not found. Please register.")
             else:
                 st.error("⚠️ Please verify your email before logging in. Check your inbox.")
         except Exception as e:
@@ -150,34 +150,6 @@ def to_login():
 CLOUD_NAME = "dusq8j5cp"
 UPLOAD_PRESET = "unsigned_upload"
 CLOUDINARY_URL = f"https://api.cloudinary.com/v1_1/{CLOUD_NAME}/image/upload"
-
-
-# def upload_to_cloudinary(image):
-#     """Uploads an image to Cloudinary and returns the URL."""
-#     try:
-#         image = image.convert("RGB")
-#         max_size = 1024
-#         image.thumbnail((max_size, max_size))
-#         img_bytes = io.BytesIO()
-#         image.save(img_bytes, format="PNG")  # Save image as PNG
-#         img_bytes.seek(0)
-
-#         # Prepare request payload
-#         files = {"file": img_bytes}
-#         data = {"upload_preset": UPLOAD_PRESET}
-
-#         # Upload to Cloudinary
-#         response = requests.post(CLOUDINARY_URL, files=files, data=data)
-        
-#         if response.status_code == 200:
-#             return response.json().get("secure_url")  # Return the image URL
-#         else:
-#             st.error(f"Failed to upload image. Status code: {response.status_code}, Response: {response.text}")
-#             return None
-#     except Exception as e:
-#         st.error(f"Image processing or upload error: {e}")
-#         return None
-
 
 def upload_to_cloudinary(image):
     """Uploads an image to Cloudinary and returns the URL."""
@@ -675,9 +647,13 @@ def to_profile():
     if "user" in st.session_state:
         user = st.session_state["user"]
 
-        user_query = db.collection("users").where("email", "==", user["email"]).limit(1).stream()
-        user_data = next(user_query, None)
-        user_email = user_data.to_dict().get("email", "User") if user_data else "User"
+        try:
+            user_query = db.collection("users").where("email", "==", user["email"]).limit(1).stream()
+            user_data = next(user_query, None)
+            user_email = user_data.to_dict().get("email", "User") if user_data else "User"
+        except Exception as e:
+            st.error(f"❌ Error fetching user data: {e}")
+            first_name = "User"
 
         st.markdown('<div class="container">', unsafe_allow_html=True)
         st.markdown('<div class="title">Profile & Information</div>', unsafe_allow_html=True)
@@ -786,26 +762,11 @@ def to_profile():
                 address = st.text_area("Enter your address (House No., Street, City, State, Zip Code, Country)", 
                                     value=user_data["address"], key="address").strip()
                 
-                image_url = ""
+                image_url = user_data["profile_picture"]
                 if uploaded_file:
                     image = Image.open(uploaded_file)
                     # Upload to Cloudinary
-                    image_url = upload_to_cloudinary(image)
-                else:
-                    image_url = user_data["profile_picture"]
                     
-                updated_data = {
-                    "first_name": first_name,
-                    "middle_name": middle_name,
-                    "last_name": last_name,
-                    "gender": gender,
-                    "birthday": str(birthday),
-                    "country_code": country_code,
-                    "mobile_number": mobile_number,
-                    "address": address,
-                    "profile_picture": image_url,
-                }
-    
                 if st.button("Update Profile", use_container_width=True):
                     if not first_name or not last_name or not re.match(r'^[A-Za-z ]+$', first_name) or not re.match(r'^[A-Za-z ]+$', middle_name) or not re.match(r'^[A-Za-z ]+$', last_name):
                         st.error("⚠️ Names are required (excl. middle name) and must only contain letters and spaces.")
@@ -816,8 +777,21 @@ def to_profile():
                     elif gender not in gender_options:
                         st.error("⚠️ Please select a valid gender.")
                     else:
+                        image_url = upload_to_cloudinary(image)
+                        updated_data = {
+                            "first_name": first_name,
+                            "middle_name": middle_name,
+                            "last_name": last_name,
+                            "gender": gender,
+                            "birthday": str(birthday),
+                            "country_code": country_code,
+                            "mobile_number": mobile_number,
+                            "address": address,
+                            "profile_picture": image_url,
+                        }
                         if update_user_data(user_data["email"], updated_data):
                             st.success("✅ Profile updated successfully!")
+                            uploaded_file = None
                             time.sleep(2)
                             st.rerun()
                         else:
@@ -845,27 +819,31 @@ def to_dashboard():
             user_query = db.collection("users").where("email", "==", user["email"]).limit(1).stream()
             user_data = next(user_query, None)
             first_name = user_data.to_dict().get("first_name", "User") if user_data else "User"
+            user_email = user_data.to_dict().get("email", "User") if user_data else "User"
         except Exception as e:
             st.error(f"❌ Error fetching user data: {e}")
             first_name = "User"
+
+        user_data = get_user_data(user_email)
 
         st.markdown('<div class="container">', unsafe_allow_html=True)
         st.markdown(f'<div class="title">Welcome, {first_name}!</div>', unsafe_allow_html=True)
 
         ppcol1, ppcol2, ppcol3 = st.columns([2,1,2])
-        with ppcol2:
-            try:
-                st.markdown(
-                    f"""
-                        <div style="display: flex; justify-content: center;">
-                            <img src="{user['profile_picture']}" alt="Profile Picture" 
-                                style="width: 100px; height: 100px;  border-radius: 100px; object-fit: cover; border: solid #333 5px">
-                        </div>
-                        """,
-                        unsafe_allow_html=True,
-                    )
-            except Exception as e:
-                st.error(f"❌ Error fetching profile picture: {e}")
+        if user_data:
+            with ppcol2:
+                try:
+                    st.markdown(
+                        f"""
+                            <div style="display: flex; justify-content: center;">
+                                <img src="{user_data['profile_picture']}" alt="Profile Picture" 
+                                    style="width: 100px; height: 100px;  border-radius: 100px; object-fit: cover; border: solid #333 5px">
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+                except Exception as e:
+                    st.error(f"❌ Error fetching profile picture: {e}")
 
         st.markdown('<hr class="style-two-grid">', unsafe_allow_html=True)
 
