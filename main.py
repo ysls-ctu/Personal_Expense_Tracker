@@ -578,7 +578,6 @@ def to_analytics():
                         ax.set_xlabel("Week")
                         ax.set_ylabel("Total Spending (₱)")
                         st.pyplot(fig)
-                        st.divider()
                 
                 with st.expander("View Spending Habits Summary"):
                     df_filtered["date"] = pd.to_datetime(df_filtered["date"], errors="coerce")
@@ -1018,34 +1017,7 @@ def to_dashboard():
 
         st.markdown('<hr class="style-two-grid">', unsafe_allow_html=True)
         st.subheader("Your Expenses History")
-        # try:
-        #     docs = db.collection("expenses").where("user", "==", user["email"]).stream()
-        #     expenses = [{**doc.to_dict(), "id": doc.id} for doc in docs]
 
-        #     if expenses:
-        #         df = pd.DataFrame(expenses)
-        #         column_mapping = {
-        #             "date": "Purchase Date",
-        #             "item_name": "Item Name",
-        #             "amount": "Amount (₱)",
-        #             "category": "Category",
-        #             "notes": "Notes"
-        #         }
-        #         df.rename(columns=column_mapping, inplace=True)
-        #         df = df[list(column_mapping.values())]
-        #         st.data_editor(
-        #             df,
-        #             height=560,
-        #             use_container_width=True,  
-        #             hide_index=True
-        #         )
-        #     else:
-        #         st.info("ℹ️ No expenses recorded yet.")
-        # except Exception as e:
-        #     st.error(f"❌ Error fetching expenses: {e}")
-
-        # if st.button("🔄 Refresh"):
-        #     st.experimental_rerun() 
         try:
             # Fetch expenses from Firestore
             docs = db.collection("expenses").where("user", "==", user["email"]).stream()
@@ -1053,8 +1025,8 @@ def to_dashboard():
 
             if expenses:
                 df = pd.DataFrame(expenses)
-
-                # Rename columns for better readability
+                
+                # Column mappings
                 column_mapping = {
                     "date": "Purchase Date",
                     "item_name": "Item Name",
@@ -1063,64 +1035,95 @@ def to_dashboard():
                     "notes": "Notes"
                 }
                 df.rename(columns=column_mapping, inplace=True)
-
-                # Exclude 'last_updated' column from the displayed table
+                
+                # Remove 'last_updated' if exists
                 if "last_updated" in df.columns:
                     df.drop(columns=["last_updated"], inplace=True)
+                
+                # Keep ID for updates but hide in UI
+                df = df[list(column_mapping.values()) + ["id"]]
 
-                df = df[list(column_mapping.values()) + ["id"]]  # Keep ID for updates
+                # --- SEARCH FUNCTIONALITY ---
+                search_query = st.text_input("Search for an expense", "").strip().lower()
 
-                edited_df = st.data_editor(
-                    df.drop(columns=["id"]),  
-                    height=560,
-                    use_container_width=True,
-                    hide_index=True,
-                )
+                if search_query:
+                    search_tokens = search_query.split()
+                    filtered_df = df[df.apply(lambda row: all(any(token in str(value).lower() for value in row) for token in search_tokens), axis=1)]
+                else:
+                    filtered_df = df.copy()
 
-                # Detect changes and update Firestore
-                if "edited_expenses" not in st.session_state:
-                    st.session_state.edited_expenses = df.copy()
+                # Only proceed if filtered_df has results
+                if not filtered_df.empty:
+                    # Add selection column for deletion
+                    filtered_df["Delete?"] = False
 
-                if not edited_df.equals(st.session_state.edited_expenses):
-                    st.session_state.edited_expenses = edited_df.copy()
-                    
-                    updates = {}  # Store only changed rows
-                    for i, row in edited_df.iterrows():
-                        original_row = df.loc[i]  # Get original data
-                        doc_id = original_row["id"]
+                    # --- UNIFIED TABLE (EDIT + DELETE) ---
+                    edited_df = st.data_editor(
+                        filtered_df.drop(columns=["id"]),
+                        height=560,
+                        use_container_width=True,
+                        hide_index=True,
+                        column_config={"Delete?": st.column_config.CheckboxColumn()},
+                    )
 
-                        # Check which fields were changed
-                        updated_fields = {
-                            "last_updated": SERVER_TIMESTAMP  # Add timestamp for every update
-                        }
-                        if row["Amount (₱)"] != original_row["Amount (₱)"]:
-                            updated_fields["amount"] = row["Amount (₱)"]
-                        if row["Category"] != original_row["Category"]:
-                            updated_fields["category"] = row["Category"]
-                        if row["Purchase Date"] != original_row["Purchase Date"]:
-                            updated_fields["date"] = row["Purchase Date"]
-                        if row["Item Name"] != original_row["Item Name"]:
-                            updated_fields["item_name"] = row["Item Name"]
-                        if row["Notes"] != original_row["Notes"]:
-                            updated_fields["notes"] = row["Notes"]
+                    # --- DETECT EDITS & UPDATE FIRESTORE ---
+                    if "edited_expenses" not in st.session_state:
+                        st.session_state.edited_expenses = filtered_df.copy()
 
-                        if len(updated_fields) > 1:  # Only update if fields changed
-                            updates[doc_id] = updated_fields  
+                    if not edited_df.equals(st.session_state.edited_expenses):
+                        st.session_state.edited_expenses = edited_df.copy()
 
-                    if updates:
-                        batch = db.batch()
-                        for doc_id, fields in updates.items():
-                            doc_ref = db.collection("expenses").document(doc_id)
-                            batch.update(doc_ref, fields)
-                        batch.commit()  # Send all updates at once
-                        st.success("✅ Changes saved successfully!")
+                        updates = {}  # Store only changed rows
+                        for i, row in edited_df.iterrows():
+                            original_row = filtered_df.loc[i]  # Get original data
+                            doc_id = original_row["id"]
 
-                        ref1, ref2, ref3 = st.columns([1,3,1])
-                        # Refresh button to reload table after saving
-                        with ref2:
-                            if st.button("🔄 Refresh Table", use_container_width=True):
-                                st.experimental_rerun()
+                            # Check changed fields
+                            updated_fields = {"last_updated": firestore.SERVER_TIMESTAMP}
+                            for col_ui, col_db in column_mapping.items():
+                                if row[col_db] != original_row[col_db]:
+                                    updated_fields[col_ui] = row[col_db]
 
+                            if len(updated_fields) > 1:  # If fields changed, update Firestore
+                                updates[doc_id] = updated_fields  
+
+                        if updates:
+                            batch = db.batch()
+                            for doc_id, fields in updates.items():
+                                doc_ref = db.collection("expenses").document(doc_id)
+                                batch.update(doc_ref, fields)
+                            batch.commit()
+                            st.success("✅ Changes saved successfully!")
+                            ref1, ref2, ref3 = st.columns([1,3,1])
+                            # Refresh button to reload table after saving
+                            with ref2:
+                                if st.button("🔄 Refresh Table", use_container_width=True):
+                                    st.experimental_rerun()
+
+                    # --- DELETE FUNCTIONALITY ---
+                    selected_ids = filtered_df[edited_df["Delete?"]]["id"].tolist()
+
+                    if selected_ids:
+                        if st.button("🗑️ Delete Selected", use_container_width=True):
+                            batch = db.batch()
+                            for doc_id in selected_ids:
+                                batch.delete(db.collection("expenses").document(doc_id))
+                            batch.commit()
+                            st.success("✅ Selected expenses deleted successfully!")
+                            ref1, ref2, ref3 = st.columns([1,3,1])
+                            # Refresh button to reload table after saving
+                            with ref2:
+                                if st.button("🔄 Refresh Table", use_container_width=True):
+                                    st.experimental_rerun()
+                else:
+                    st.markdown(
+                        """
+                        <div style="text-align: center; padding: 20px;">
+                            <p style="font-size:20px;">No results found. Try again!</p>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
             else:
                 st.info("ℹ️ No expenses recorded yet.")
 
