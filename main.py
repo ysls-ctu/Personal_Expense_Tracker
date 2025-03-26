@@ -155,31 +155,7 @@ CLOUD_NAME = "dusq8j5cp"
 UPLOAD_PRESET = "unsigned_upload"
 CLOUDINARY_URL = f"https://api.cloudinary.com/v1_1/{CLOUD_NAME}/image/upload"
 
-# def upload_to_cloudinary(image):
-#     """Uploads an image to Cloudinary and returns the URL."""
-#     try:
-#         image = image.convert("RGB")
-#         max_size = 1024
-#         image.thumbnail((max_size, max_size))
-#         img_bytes = io.BytesIO()
-#         image.save(img_bytes, format="PNG")  # Save image as PNG
-#         img_bytes.seek(0)
-
-#         # Prepare request payload
-#         files = {"file": img_bytes}
-#         data = {"upload_preset": UPLOAD_PRESET}
-
-#         # Upload to Cloudinary
-#         response = requests.post(CLOUDINARY_URL, files=files, data=data)
-        
-#         if response.status_code == 200:
-#             return response.json().get("secure_url")  # Return the image URL
-#         else:
-#             st.error("Failed to upload image.")
-#             return None
-#     except:
-#         st.error(f"Image processing or upload error: {e}")
-#         return None
+# cloudinary upload
 
 def upload_to_cloudinary(image):
     """Uploads an image to Cloudinary and returns the URL."""
