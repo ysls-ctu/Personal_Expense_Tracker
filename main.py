@@ -1157,10 +1157,16 @@ def to_dashboard():
             if st.button("View Profile & Information", use_container_width=True):
                 st.session_state["page"] = "Profile"
                 st.rerun()
+            if st.button("Send Feedback", use_container_width=True):
+                st.session_state["page"] = "Send Feedback"
+                st.rerun()
 
         with col2:
             if st.button("View Detailed Analytics", use_container_width=True):
                 st.session_state["page"] = "Analytics"
+                st.rerun()
+            if st.button("Contact YSLS", use_container_width=True):
+                st.session_state["page"] = "Contact YSLS"
                 st.rerun()
         
         st.divider()
@@ -1173,12 +1179,109 @@ def to_dashboard():
     else:
         st.warning("⚠️ Please log in to access the dashboard.")
 
+def to_feedback():
+    if "user" in st.session_state:
+        user = st.session_state["user"]
+
+        if "feedback_cat" not in st.session_state:
+            st.session_state["feedback_cat"] = []
+        if "feedback_text" not in st.session_state:
+            st.session_state["feedback_text"] = ""
+                
+        try:
+            user_query = db.collection("users").where("email", "==", user["email"]).limit(1).stream()
+            user_data = next(user_query, None)
+            first_name = user_data.to_dict().get("first_name", "User") if user_data else "User"
+            user_email = user_data.to_dict().get("email", "User") if user_data else "User"
+        except Exception as e:
+            st.error(f"❌ Error fetching user data: {e}")
+            first_name = "User"
+
+        user_data = get_user_data(user_email)
+
+        st.markdown('<div class="container">', unsafe_allow_html=True)
+        st.markdown(f'<div style="text-align: center; font-size: 29px; font-weight: 700; line-height: 1.1;">Hello, {first_name}! <br></div>', unsafe_allow_html=True)
+        st.markdown('<div style="text-align: center; font-size: 20px; "><center>How can we help you today?<br><br></center></div>', unsafe_allow_html=True)
+
+        with st.form("feedback_form"):
+            feedback_cat = st.multiselect("Category", ["Bugs and Errors", "User Interface", "Feature Request", "Performace", "Security & Privacy", "General Feedback", "Other"], key="feedback_cat")
+            feedback_text = st.text_area("Details", placeholder="Type your details here", key="feedback_text", height=250)
+            is_anonymous = st.checkbox("Submit as Anonymous")
+            "\n"
+            col1,col2,col3 = st.columns([1,2,1])
+            with col2: submit_button = st.form_submit_button("Submit Feedback", use_container_width=True)
+    
+            if submit_button:
+                if not st.session_state.feedback_cat:
+                    st.error("⚠️ Please provide feedback category!")
+                elif not st.session_state.feedback_text.strip():
+                    st.error("⚠️ Please provide feedback details!")
+                else:
+                    try:
+                        # Prepare feedback data
+                        feedback_data = {
+                            "user_email": "Anonymous" if is_anonymous else user["email"],
+                            "categories": st.session_state.feedback_cat,
+                            "description": st.session_state.feedback_text.strip(),
+                            "timestamp": firestore.SERVER_TIMESTAMP
+                        }
+
+                       # Save to Firestore
+                        db.collection("feedback").add(feedback_data)
+
+                        st.success("✅ Feedback submitted successfully! Refreshing ... ")
+
+                        del st.session_state["feedback_cat"]
+                        del st.session_state["feedback_text"]
+
+                        time.sleep(1)
+                        st.rerun()  
+
+                    except Exception as e:
+                        st.error(f"❌ Failed to submit feedback: {e}")
+
+        st.markdown('<hr class="style-two-grid">', unsafe_allow_html=True)
+        colg1, colg2 = st.columns([1,1])
+        with colg1:
+            if st.button("Back to Dashboard", use_container_width=True):
+                st.session_state["page"] = "Dashboard"
+                st.rerun()
+        with colg2:
+            if st.button("Contact YSLS", use_container_width=True):
+                st.session_state["page"] = "Contact YSLS"
+                st.rerun()
+
+def to_contactYSLS():
+    if "user" in st.session_state:
+        user = st.session_state["user"]
+        
+        try:
+            user_query = db.collection("users").where("email", "==", user["email"]).limit(1).stream()
+            user_data = next(user_query, None)
+            first_name = user_data.to_dict().get("first_name", "User") if user_data else "User"
+            user_email = user_data.to_dict().get("email", "User") if user_data else "User"
+        except Exception as e:
+            st.error(f"❌ Error fetching user data: {e}")
+            first_name = "User"
+
+        user_data = get_user_data(user_email)
+
+        st.markdown('<div class="container">', unsafe_allow_html=True)
+        st.markdown(f'<div class="title">Welcome, {first_name}!</div>', unsafe_allow_html=True)
+
+        st.markdown('<hr class="style-two-grid">', unsafe_allow_html=True)
+        colg1, colg2 = st.columns([1,1])
+        with colg1:
+            if st.button("Back to Dashboard", use_container_width=True):
+                st.session_state["page"] = "Dashboard"
+                st.rerun()
+
 col1, col_image, col3 = st.columns([1, 5, 1])
 with col_image:
     st.image("header_bg.png", width=1000)
 
 # Sidebar Menu
-menu = ["Login", "Sign Up", "Forgot Password", "Dashboard", "Analytics", "Profile"]
+menu = ["Login", "Sign Up", "Forgot Password", "Dashboard", "Analytics", "Profile", "Send Feedback", "Contact YSLS"]
 if "page" not in st.session_state:
     st.session_state["page"] = "Login"
 if st.session_state["page"] == "Login":
@@ -1193,3 +1296,7 @@ elif st.session_state["page"] == "Analytics":
     to_analytics()
 elif st.session_state["page"] == "Profile":
     to_profile()
+elif st.session_state["page"] == "Send Feedback":
+    to_feedback()
+elif st.session_state["page"] == "Contact YSLS":
+    to_contactYSLS()
