@@ -1028,6 +1028,7 @@ def to_dashboard():
                     })
 
                     st.success("✅ Expense added successfully!")
+                    st.balloons()
                     rcol1,rcol2,rcol3 = st.columns([1,1,1])
                     with rcol2: st.button("Reset Form", on_click=reset_form, use_container_width=True)
 
