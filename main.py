@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pytz
 from google.cloud.firestore import SERVER_TIMESTAMP
+import streamlit.components.v1 as components
 
 # check 1
 if not firebase_admin._apps:
@@ -90,6 +91,14 @@ st.markdown(
         hr.style-two-grid {
             border: 0;
             height: 5px !important;
+            background: #333;
+            background-image: linear-gradient(to right, #ccc, black, #ccc);
+        }
+        hr.style-one-grid {
+            border: 0;
+            height: 1px !important;
+            margin-top: -10px;
+            margin-bottom: -100px;
             background: #333;
             background-image: linear-gradient(to right, #ccc, black, #ccc);
         }
@@ -1064,7 +1073,7 @@ def to_dashboard():
                 df = df[list(column_mapping.values()) + ["id"]]
 
                 # --- SEARCH FUNCTIONALITY ---
-                search_query = st.text_input("Search for an expense", "").strip().lower()
+                search_query = st.text_input("Search your expenses", "", placeholder="Type here").strip().lower()
 
                 if search_query:
                     search_tokens = search_query.split()
@@ -1166,7 +1175,7 @@ def to_dashboard():
             if st.button("View Detailed Analytics", use_container_width=True):
                 st.session_state["page"] = "Analytics"
                 st.rerun()
-            if st.button("Contact YSLS", use_container_width=True):
+            if st.button("View Message Center", use_container_width=True):
                 st.session_state["page"] = "Contact YSLS"
                 st.rerun()
         
@@ -1208,6 +1217,8 @@ def to_feedback():
             feedback_cat = st.multiselect("Category", ["Bugs and Errors", "User Interface", "Feature Request", "Performace", "Security & Privacy", "General Feedback", "Other"], key="feedback_cat")
             feedback_text = st.text_area("Details", placeholder="Type your details here", key="feedback_text", height=250)
             is_anonymous = st.checkbox("Submit as Anonymous")
+
+
             "\n"
             col1,col2,col3 = st.columns([1,2,1])
             with col2: submit_button = st.form_submit_button("Submit Feedback", use_container_width=True)
@@ -1253,30 +1264,221 @@ def to_feedback():
                 st.rerun()
 
 def to_contactYSLS():
+    def get_user_data(email):
+        try:
+            user_doc = db.collection("users").where("email", "==", email).limit(1).stream()
+            user_data = next(user_doc, None)  # Prevent StopIteration error
+            return user_data.to_dict() if user_data else {}  # Return empty dict instead of None
+        except Exception as e:
+            st.error(f"Error fetching user data: {e}")
+            return {}  # Return empty dict on error
+
+    def get_conversations(user_email):
+        try:
+            conv_docs = db.collection("conversations").where("participants", "array_contains", user_email).stream()
+            conversations = {}
+
+            for doc in conv_docs:
+                convo_data = doc.to_dict()
+                other_participant_email = [p for p in convo_data["participants"] if p != user_email][0]
+                
+                # Ensure the other participant exists
+                other_participant_data = get_user_data(other_participant_email)  
+                if not other_participant_data:  # If user does not exist
+                    continue  # Skip this conversation
+
+                other_participant_name = f"{other_participant_data.get('first_name', 'Unknown')} {other_participant_data.get('last_name', '')}".strip()
+                conversations[doc.id] = {
+                    "id": doc.id,
+                    "participant": other_participant_name,
+                    "email": other_participant_email
+                }
+
+            return conversations
+        except Exception as e:
+            st.error(f"Error fetching conversations: {e}")
+            return {}
+
+    def get_messages(conversation_id):
+        try:
+            messages = db.collection("conversations").document(conversation_id).collection("messages").order_by("timestamp").stream()
+            return [msg.to_dict() for msg in messages]
+        except Exception as e:
+            st.error(f"Error fetching messages: {e}")
+            return []
+
+    def send_message(conversation_id, sender, message):
+        try:
+            db.collection("conversations").document(conversation_id).collection("messages").add({
+                "sender": sender,
+                "message": message,
+                "timestamp": firestore.SERVER_TIMESTAMP
+            })
+            # st.rerun()
+
+        except Exception as e:
+            st.error(f"Error sending message: {e}")
+            
+    if "message_cont" not in st.session_state:
+        st.session_state["message_cont"] = ""
+
+    if "last_message" not in st.session_state:
+        st.session_state["last_message"] = ""
+
+    # Define the function to send the message and clear the input
+    def send_message_and_clear():
+        if st.session_state.message_cont.strip():  # Avoid sending empty messages
+            send_message(selected_convo, user_email, st.session_state.message_cont)
+            st.session_state.last_message = st.session_state.message_cont  # Store last sent message
+            st.session_state.message_cont = ""  # Clear input field
+
+    def start_new_conversation(user_email, recipient_email):
+        try:
+            existing_convo = db.collection("conversations").where("participants", "array_contains", user_email).stream()
+            for convo in existing_convo:
+                if recipient_email in convo.to_dict()["participants"]:
+                    return convo.id
+            convo_ref = db.collection("conversations").add({
+                "participants": [user_email, recipient_email],
+                "created_at": firestore.SERVER_TIMESTAMP
+            })
+            return convo_ref[1].id
+        except Exception as e:
+            st.error(f"Error starting conversation: {e}")
+        
     if "user" in st.session_state:
         user = st.session_state["user"]
+        user_data = get_user_data(user["email"])
+        user_email = user_data.get("email", "User") if user_data else "User"
         
-        try:
-            user_query = db.collection("users").where("email", "==", user["email"]).limit(1).stream()
-            user_data = next(user_query, None)
-            first_name = user_data.to_dict().get("first_name", "User") if user_data else "User"
-            user_email = user_data.to_dict().get("email", "User") if user_data else "User"
-        except Exception as e:
-            st.error(f"❌ Error fetching user data: {e}")
-            first_name = "User"
+        st.title("Message Center")
+        col1, col2 = st.columns([1, 2])
+        
+        with col1:
+            st.subheader("Contacts")
+            conversations = get_conversations(user_email)
+            selected_convo = st.session_state.get("selected_convo", None)
+            
+            if conversations:
+                convo_options = {convo["participant"]: convo_id for convo_id, convo in conversations.items()}
 
-        user_data = get_user_data(user_email)
+                selected_participant = st.selectbox("Select a conversation:", list(convo_options.keys()), key="selected_convo_dropdown")
 
-        st.markdown('<div class="container">', unsafe_allow_html=True)
-        st.markdown(f'<div class="title">Welcome, {first_name}!</div>', unsafe_allow_html=True)
+                # Update session state when selection changes
+                if selected_participant:
+                    st.session_state["selected_convo"] = convo_options[selected_participant]
+                    st.session_state["selected_user"] = selected_participant
+            else:
+                st.warning("No conversations yet. Start a new one below!")
+
+            st.subheader("New Message")
+            "\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
+            "\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
+            "\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
+            new_user_email = st.text_input("Enter recipient email")
+            if st.button("Start Conversation", use_container_width=True) and new_user_email:
+                # Validate email format (basic check)
+                if "@" not in new_user_email or "." not in new_user_email:
+                    st.error("Invalid email format. Please enter a valid email address.")
+                else:
+                    # Check if the recipient exists in Firestore
+                    recipient_data = get_user_data(new_user_email)
+
+                    if recipient_data is None:
+                        st.error("User not found. Please enter a registered email.")
+                    else:
+                        convo_id = start_new_conversation(user_email, new_user_email)
+                        if convo_id:
+                            st.session_state["selected_convo"] = convo_id
+                            st.session_state["selected_user"] = f"{recipient_data.get('first_name', 'Unknown')} {recipient_data.get('last_name', '')}".strip()
+                    
+        with col2:
+            if "selected_convo" in st.session_state and "selected_user" in st.session_state:
+                selected_convo = st.session_state["selected_convo"]
+                selected_user = st.session_state["selected_user"]
+
+                def get_sender_name(email):
+                    if email == user_email:
+                        return user["first_name"] + " " + user["last_name"] # Show 'You' when the message is from the logged-in user
+                    return selected_user
+
+                st.markdown(
+                    f"""
+                    <div style="display: flex; align-items: center; gap: 10px; padding: 10px;">
+                        <span style="font-size: 17px; font-weight: 600; color: #292929; margin-bottom: -10px; background-color: #f0f2f6; width: 100%; border-radius: 10px; padding: 10px;"><center>{selected_user}</center></span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+)
+                chat_html = '''
+                <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&display=swap" rel="stylesheet">
+                <div style="height: 400px; overflow-y: auto; padding: 15px; background-color: #f0f2f6; border-radius: 5px; border: solid #f0f2f6 2px; font-family: 'Source Sans Pro', sans-serif;">
+                '''
+                
+                messages = get_messages(selected_convo)  # Your function to retrieve messages
+
+                for msg in messages:
+                    is_user = msg["sender"] == user_email
+                    if isinstance(msg["timestamp"], str):
+                        dt = datetime.strptime(
+                            msg["timestamp"].split(" at ")[0]
+                            + " "
+                            + msg["timestamp"].split(" at ")[1].split(" ")[0]
+                            + " "
+                            + msg["timestamp"].split(" ")[-2],
+                            "%B %d, %Y %I:%M:%S %p",
+                        )
+                    else:
+                        dt = msg["timestamp"]
+                    military_time = msg["timestamp"].strftime("%B %d, %Y %H:%M")
+                    alignment = "flex-end" if is_user else "flex-start"
+                    bg_color = "#598ac2" if is_user else "white"
+                    text_color = "white" if is_user else "black"
+
+                    chat_html += f"""
+                    <div style="display: flex; flex-direction: column; align-items: {alignment}; margin: 5px 0;">
+                        <div style="padding: 10px; border-radius: 10px; background-color: {bg_color}; color: {text_color}; 
+                                    max-width: 75%; word-wrap: break-word;">
+                            <div style="font-weight: 800; font-size: 13px;">
+                                {get_sender_name(msg['sender'])}
+                            </div> 
+                            <div style="font-size: 14px;">
+                                {msg['message']}
+                            </div>
+                            <div style="font-size: 10px; opacity: 0.7; text-align: right; display: block; margin-top:10px;">
+                                {military_time}
+                            </div>
+                        </div>
+                    </div>
+                    """
+                chat_html += "</div>"
+                # Render the chat container using Streamlit's HTML component
+                components.html(chat_html, height=450)
+
+                # Input box for new messages
+                st.markdown(
+                    """
+                    <style>
+                        div[data-testid="stTextInput"] {
+                            margin-top: -67px !important;
+                            width: 97% !important;
+                            margin: auto;
+                        }
+
+                    </style>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+                st.text_input("", placeholder="Type your message here", key="message_cont", on_change=send_message_and_clear)
 
         st.markdown('<hr class="style-two-grid">', unsafe_allow_html=True)
-        colg1, colg2 = st.columns([1,1])
-        with colg1:
-            if st.button("Back to Dashboard", use_container_width=True):
-                st.session_state["page"] = "Dashboard"
-                st.rerun()
+        "\n\n"
+        if st.button("Back to Dashboard", use_container_width=True):
+            st.session_state["page"] = "Dashboard"
+            st.rerun()
 
+# header
 col1, col_image, col3 = st.columns([1, 5, 1])
 with col_image:
     st.image("header_bg.png", width=1000)
