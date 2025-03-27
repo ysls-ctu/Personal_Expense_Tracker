@@ -1411,26 +1411,24 @@ def to_contactYSLS():
                     unsafe_allow_html=True
 )
                 chat_html = '''
-                <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&display=swap" rel="stylesheet">
-                <div class="chat-container" style="height: 400px; overflow-y: auto; padding: 15px; background-color: #f0f2f6; border-radius: 5px; border: solid #f0f2f6 2px; font-family: 'Source Sans Pro', sans-serif; display: flex; flex-direction: column; justify-content: flex-end;">
+                    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&display=swap" rel="stylesheet">
+                    <div id="chat-container" class="chat-container" 
+                        style="height: 400px; overflow-y: auto; display: flex; flex-direction: column-reverse; 
+                        padding: 15px; background-color: #f0f2f6; border-radius: 5px; border: solid #f0f2f6 2px; 
+                        font-family: 'Source Sans Pro', sans-serif;">
                 '''
-                
-                messages = get_messages(selected_convo)  # Your function to retrieve messages
+
+                messages = get_messages(selected_convo)  # Retrieve messages
+
+                # Reverse the message order to show latest messages at the bottom
+                messages.reverse()
 
                 for msg in messages:
                     is_user = msg["sender"] == user_email
-                    if isinstance(msg["timestamp"], str):
-                        dt = datetime.strptime(
-                            msg["timestamp"].split(" at ")[0]
-                            + " "
-                            + msg["timestamp"].split(" at ")[1].split(" ")[0]
-                            + " "
-                            + msg["timestamp"].split(" ")[-2],
-                            "%B %d, %Y %I:%M:%S %p",
-                        )
-                    else:
-                        dt = msg["timestamp"]
-                    military_time = msg["timestamp"].strftime("%B %d, %Y %H:%M")
+                    dt = msg["timestamp"] if not isinstance(msg["timestamp"], str) else datetime.strptime(
+                        msg["timestamp"].split(" at ")[0] + " " + msg["timestamp"].split(" at ")[1].split(" ")[0] + " " +
+                        msg["timestamp"].split(" ")[-2], "%B %d, %Y %I:%M:%S %p")
+                    military_time = dt.strftime("%B %d, %Y %H:%M")
                     alignment = "flex-end" if is_user else "flex-start"
                     bg_color = "#598ac2" if is_user else "white"
                     text_color = "white" if is_user else "black"
@@ -1451,15 +1449,8 @@ def to_contactYSLS():
                         </div>
                     </div>
                     """
-                chat_html += """
-                </div>
-                <script>
-                    setTimeout(function() {
-                        var chatContainer = document.getElementById("chat-container");
-                        chatContainer.scrollTop = chatContainer.scrollHeight;
-                    }, 500); // Delay for rendering completion
-                </script>
-                """
+
+                chat_html += "</div>"
                 components.html(chat_html, height=450)
 
                 # Input box for new messages
