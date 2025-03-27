@@ -1412,7 +1412,7 @@ def to_contactYSLS():
 )
                 chat_html = '''
                 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&display=swap" rel="stylesheet">
-                <div style="height: 400px; overflow-y: auto; padding: 15px; background-color: #f0f2f6; border-radius: 5px; border: solid #f0f2f6 2px; font-family: 'Source Sans Pro', sans-serif;">
+                <div class="chat-container" style="height: 400px; overflow-y: auto; padding: 15px; background-color: #f0f2f6; border-radius: 5px; border: solid #f0f2f6 2px; font-family: 'Source Sans Pro', sans-serif; display: flex; flex-direction: column; justify-content: flex-end;">
                 '''
                 
                 messages = get_messages(selected_convo)  # Your function to retrieve messages
@@ -1437,7 +1437,7 @@ def to_contactYSLS():
 
                     chat_html += f"""
                     <div style="display: flex; flex-direction: column; align-items: {alignment}; margin: 5px 0;">
-                        <div style="padding: 10px; border-radius: 10px; background-color: {bg_color}; color: {text_color}; 
+                        <div class="chat-message" style="padding: 10px; border-radius: 10px; background-color: {bg_color}; color: {text_color}; 
                                     max-width: 75%; word-wrap: break-word;">
                             <div style="font-weight: 800; font-size: 13px;">
                                 {get_sender_name(msg['sender'])}
@@ -1451,8 +1451,15 @@ def to_contactYSLS():
                         </div>
                     </div>
                     """
-                chat_html += "</div>"
-                # Render the chat container using Streamlit's HTML component
+                chat_html += """
+                </div>
+                <script>
+                    setTimeout(function() {
+                        var chatContainer = document.getElementById("chat-container");
+                        chatContainer.scrollTop = chatContainer.scrollHeight;
+                    }, 500); // Delay for rendering completion
+                </script>
+                """
                 components.html(chat_html, height=450)
 
                 # Input box for new messages
