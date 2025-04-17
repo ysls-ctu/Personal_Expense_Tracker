@@ -33,7 +33,7 @@ if not firebase_admin._apps:
     }
 
     cred = credentials.Certificate(firebase_creds)  # Load directly, no file writing
-    firebase_admin.initialize_app(cred)
+    # firebase_admin.initialize_app(cred)
 
 db = firestore.client()
 
@@ -390,8 +390,14 @@ def to_signup():
     if st.button("Create Account", key="signup_btn", use_container_width=True):
         if agreed_to_terms:
             # Form validation
-            if not first_name or not last_name or not re.match(r'^[A-Za-z ]+$', first_name) or not re.match(r'^[A-Za-z ]+$', middle_name) or not re.match(r'^[A-Za-z ]+$', last_name):
-                st.error("⚠️ Names are required (excl. middle name) and must only contain letters and spaces.")
+            if (
+                not first_name 
+                or not last_name 
+                or not re.match(r'^[A-Za-z ]+$', first_name) 
+                or (middle_name and not re.match(r'^[A-Za-z ]+$', middle_name))  # Validate only if middle_name is entered
+                or not re.match(r'^[A-Za-z ]+$', last_name)
+            ):
+                st.error("⚠️ First and last names are required. Middle name is optional but must contain only letters and spaces if provided.")
             elif email != confirm_email or not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', email):
                 st.error("⚠️ Email addresses must match and be in a valid format.")
             elif len(password) < 10 or not re.search(r'[A-Z]', password) or not re.search(r'[a-z]', password) or not re.search(r'\d', password) or not re.search(r'[!@#$%^&*]', password):
@@ -631,25 +637,47 @@ def to_analytics():
                     display_info(col1, "Number of Transactions", f"{len(df_filtered)}")
                     display_info(col2, "Daily Average Spending", f"₱ {daily_avg_spending:,.2f}")
                     highest_transaction = df_filtered.loc[df_filtered['amount'].idxmax()]  
-                    display_info(col2, "Highest Single Transaction", f"{highest_transaction['item_name']} (₱ {highest_transaction['amount']:,.2f})")
+                    if not df_filtered.empty:
+                        highest_transaction = df_filtered.loc[df_filtered['amount'].idxmax()]
+                        display_info(col2, "Highest Single Transaction", f"{highest_transaction['item_name']} (₱ {highest_transaction['amount']:,.2f})")
+                    else:
+                        display_info(col2, "Highest Single Transaction", "No transactions available")
+
                     st.divider()
 
                     # Category Breakdown
                     st.markdown("<h5>Category-Wise Spending</h5>", unsafe_allow_html=True)
                     col3, col4 = st.columns(2)
-                    display_info(col3, "Highest Single Transaction", f"₱ {df_filtered['amount'].max():,.2f}")
+                    if not df_filtered.empty:
+                        display_info(col3, "Highest Single Transaction", f"₱ {df_filtered['amount'].max():,.2f}")
+                    else:
+                        display_info(col3, "Highest Single Transaction", "No transactions available")
+
                     display_info(col4, "Most Expensive Category", f"{highest_category} (₱ {highest_category_amount:,.2f})")
                     st.divider()
                     st.markdown("<h5>Top 3 Categories with Highest Spending</h5>", unsafe_allow_html=True)
-                    top_categories = category_spending.nlargest(3)
-                    number = 1
-                    for category, amount in top_categories.items():
-                        col1, col2 = st.columns([1,1])  
-                        with col1:
-                            st.info(f"**{number} - {category}**")  
-                        with col2:
-                            st.success(f"₱ {amount:,.2f}") 
-                        number += 1
+                    try:
+                        if not category_spending.empty:
+                            top_categories = category_spending.nlargest(3)
+                        else:
+                            top_categories = {}
+
+                        if top_categories is not None and not top_categories.empty:
+                            number = 1
+                            for category, amount in top_categories.items():
+                                col1, col2 = st.columns([1, 1])  
+                                with col1:
+                                    st.info(f"**{number} - {category}**")  
+                                with col2:
+                                    st.success(f"₱ {amount:,.2f}") 
+                                number += 1
+                        else:
+                            st.warning("No spending data available")
+                    except Exception as e:
+                        st.warning(f"Check top categories: {e}")
+
+
+
                     st.divider()
 
                     # Weekly Insights
@@ -709,9 +737,14 @@ def to_analytics():
                                 "This indicates a mix of daily expenses and occasional bigger purchases, reflecting a well-rounded spending habit."
                             )
                         # Display Results
-                        display_info(None, "Standard Deviation of Spending", f"₱ {std_spending:,.2f}", full_width=True)
+                        colx1,colx2 = st.columns([1,1])
+                        with colx1: display_info(None, "Standard Deviation of Spending", f"₱ {std_spending:,.2f}", full_width=True)
+                        with colx2: display_info(None, "Average Transaction Amount", f"₱ {avg_spending:,.2f}", full_width=True)
+                        st.caption("Standard deviation measures how spread out your spending is from the average.")
+
                         st.info(sd_interpretation)
                         display_info(None, "Median Transaction Amount", f"₱ {median_spending:,.2f}", full_width=True)
+                        st.caption("The median is the middle value in your transactions — it tells you what a ‘typical’ spending amount looks like, unaffected by unusually large or small purchases.")
                         st.info(median_interpretation)
                     else:
                         st.info("Not enough transactions to analyze spending behavior.")
@@ -768,6 +801,7 @@ def to_analytics():
                 st.info("ℹ️ No expenses recorded yet.")
         except Exception as e:
             st.error(f"❌ Error fetching expenses: {e}")
+            st.info("empty")
 
         
 
@@ -903,8 +937,14 @@ def to_profile():
                     # Upload to Cloudinary
                     
                 if st.button("Update Profile", use_container_width=True):
-                    if not first_name or not last_name or not re.match(r'^[A-Za-z ]+$', first_name) or not re.match(r'^[A-Za-z ]+$', middle_name) or not re.match(r'^[A-Za-z ]+$', last_name):
-                        st.error("⚠️ Names are required (excl. middle name) and must only contain letters and spaces.")
+                    if (
+                        not first_name 
+                        or not last_name 
+                        or not re.match(r'^[A-Za-z ]+$', first_name) 
+                        or (middle_name and not re.match(r'^[A-Za-z ]+$', middle_name))  # Validate only if middle_name is entered
+                        or not re.match(r'^[A-Za-z ]+$', last_name)
+                    ):
+                        st.error("⚠️ First and last names are required. Middle name is optional but must contain only letters and spaces if provided.")
                     elif not mobile_number or not mobile_number.isdigit():
                         st.error("⚠️ Mobile number is required and must be numeric.")
                     elif not address:
@@ -1408,8 +1448,7 @@ def to_contactYSLS():
                         <span style="font-size: 17px; font-weight: 600; color: #292929; margin-bottom: -10px; background-color: #f0f2f6; width: 100%; border-radius: 10px; padding: 10px;"><center>{selected_user}</center></span>
                     </div>
                     """,
-                    unsafe_allow_html=True
-)
+                    unsafe_allow_html=True)
                 chat_html = '''
                     <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&display=swap" rel="stylesheet">
                     <div id="chat-container" class="chat-container" 
@@ -1417,10 +1456,8 @@ def to_contactYSLS():
                         padding: 15px; background-color: #f0f2f6; border-radius: 5px; border: solid #f0f2f6 2px; 
                         font-family: 'Source Sans Pro', sans-serif;">
                 '''
-
+                
                 messages = get_messages(selected_convo)  # Retrieve messages
-
-                # Reverse the message order to show latest messages at the bottom
                 messages.reverse()
 
                 for msg in messages:
