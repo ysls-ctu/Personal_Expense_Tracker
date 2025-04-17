@@ -33,7 +33,7 @@ if not firebase_admin._apps:
     }
 
     cred = credentials.Certificate(firebase_creds)  # Load directly, no file writing
-    # firebase_admin.initialize_app(cred)
+    firebase_admin.initialize_app(cred)
 
 db = firestore.client()
 
@@ -92,7 +92,7 @@ st.markdown(
             border: 0;
             height: 5px !important;
             background: #333;
-            background-image: linear-gradient(to right, #ccc, black, #ccc);
+            background-image: linear-gradient(to right, white, white, #white);
         }
         hr.style-one-grid {
             border: 0;
@@ -100,7 +100,7 @@ st.markdown(
             margin-top: -10px;
             margin-bottom: -100px;
             background: #333;
-            background-image: linear-gradient(to right, #ccc, black, #ccc);
+            background-image: linear-gradient(to right, white, white, white);
         }
         .hyperlink {
             text-decoration: none !important;
@@ -1304,6 +1304,8 @@ def to_feedback():
                 st.rerun()
 
 def to_contactYSLS():
+
+    st.markdown('<hr class="style-two-grid">', unsafe_allow_html=True)
     def get_user_data(email):
         try:
             user_doc = db.collection("users").where("email", "==", email).limit(1).stream()
@@ -1516,7 +1518,8 @@ def to_contactYSLS():
 # header
 col1, col_image, col3 = st.columns([1, 5, 1])
 with col_image:
-    st.image("header_bg.png", width=1000)
+    # st.image("header_bg.png", width=1000)
+    st.header("PERSONAL EXPENSE TRACKER")
 
 # Sidebar Menu
 menu = ["Login", "Sign Up", "Forgot Password", "Dashboard", "Analytics", "Profile", "Send Feedback", "Contact YSLS"]
