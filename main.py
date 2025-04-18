@@ -169,6 +169,7 @@ CLOUDINARY_URL = f"https://api.cloudinary.com/v1_1/{CLOUD_NAME}/image/upload"
 def upload_to_cloudinary(image):
     """Uploads an image to Cloudinary and returns the URL."""
     try:
+        
         # Auto-orient the image based on EXIF data
         try:
             for orientation in ExifTags.TAGS.keys():
@@ -955,10 +956,7 @@ def to_profile():
                         st.error("⚠️ Address field is required.")
                     elif gender not in gender_options:
                         st.error("⚠️ Please select a valid gender.")
-                    elif uploaded_file is None:
-                        st.error("⚠️ Please select a photo.")
                     else:
-                        image_url = upload_to_cloudinary(image)
                         updated_data = {
                             "first_name": first_name,
                             "middle_name": middle_name,
@@ -968,14 +966,22 @@ def to_profile():
                             "country_code": country_code,
                             "mobile_number": mobile_number,
                             "address": address,
-                            "profile_picture": image_url,
                         }
+
+                        if uploaded_file is not None:
+                            try:
+                                pil_image = Image.open(uploaded_file)
+                                image_url = upload_to_cloudinary(pil_image)
+                                updated_data["profile_picture"] = image_url
+                            except Exception as e:
+                               st.write(f"check: {e}")
+
                         if update_user_data(user_data["email"], updated_data):
                             st.success("✅ Profile updated successfully!")
                             time.sleep(2)
                             st.rerun()
                         else:
-                            st.error("❌ Failed to update profile.")                
+                            st.error("❌ Failed to update profile.")              
         else:
             st.error("User data not found!")
 
