@@ -900,17 +900,20 @@ def to_profile():
                     ]
                     gender = st.selectbox("Gender", gender_options, index=gender_options.index(user_data["gender"]))
                 
-                with coli2:
-                    today = date.today()
-                    min_birthday = today - timedelta(days=365 * 100)
-                    max_birthday = today
+                try:
+                    with coli2:
+                        today = date.today()
+                        min_birthday = today - timedelta(days=365 * 1000)
+                        max_birthday = today
 
-                    birthday = st.date_input(
-                        "Date of Birth",
-                        value=date.fromisoformat(user_data["birthday"]),
-                        min_value=min_birthday,
-                        max_value=max_birthday
-                    )
+                        birthday = st.date_input(
+                            "Date of Birth",
+                            value=date.fromisoformat(user_data["birthday"]),
+                            min_value=min_birthday,
+                            max_value=max_birthday
+                        )
+                except Exception as e:
+                    st.markdown(e)
 
                 # Fetch country codes
                 phone_code_url = "https://country.io/phone.json"
@@ -935,7 +938,8 @@ def to_profile():
                 if uploaded_file:
                     image = Image.open(uploaded_file)
                     # Upload to Cloudinary
-                    
+
+
                 if st.button("Update Profile", use_container_width=True):
                     if (
                         not first_name 
@@ -951,6 +955,8 @@ def to_profile():
                         st.error("⚠️ Address field is required.")
                     elif gender not in gender_options:
                         st.error("⚠️ Please select a valid gender.")
+                    elif uploaded_file is None:
+                        st.error("⚠️ Please select a photo.")
                     else:
                         image_url = upload_to_cloudinary(image)
                         updated_data = {
